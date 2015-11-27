@@ -4,14 +4,15 @@ import sys
 
 class Server:
 
-    def __init__(self, node_id):
+    def __init__(self, node_id, is_primary):
         self.node_id    = node_id
-        self.unique_id  = None  # replica_id in lecture note
+        self.unique_id  = (None, node_id)  # replica_id in lecture note
 
-        self.is_primary = False # first created server is the primary
+        self.is_primary = is_primary # first created server is the primary
         self.is_retired = False
 
         self.version_vector = {} # <server, clock>
+        self.version_vector[self.unique_id] = 1
         self.CSN = 0            # commit sequence number
         self.accept_time = 0
 
@@ -34,4 +35,5 @@ class Server:
 if __name__ == "__main__":
     cmd = sys.argv
     node_id = int(cmd[1])
+    is_primary = (cmd[2] == "True")
     s = Server(node_id)

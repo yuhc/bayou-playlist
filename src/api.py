@@ -9,15 +9,12 @@ clients = {} # list of clients
 
 def joinServer(server_id):
     # the first server is also the primary
-    if not servers:
-        servers[server_id] = Server(server_id)
-
-        s = servers[server_id]
-        s.unique_id  = (None, server_id)
-        s.is_primary = True
-        s.version_vector[s.unique_id] = 1
-    else:
-        servers[server_id] = Server(server_id)
+    p = subprocess.Popen(["./src/server.py",
+                          str(server_id),
+                          str(False) if servers else str(True)])
+    servers[server_id] = p.pid
+    if TERM_LOG:
+        print("Server#", i, " pid:", p.pid, sep="")
 
     # connect to all other servers in the system
     for index in servers:
