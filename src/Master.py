@@ -2,6 +2,11 @@
 
 import fileinput
 import string
+import subprocess, sys, os, signal, time
+
+from threading import Thread, Lock
+from network   import Network
+from ast       import literal_eval
 
 if __name__ == "__main__":
     for line in fileinput.input():
@@ -16,12 +21,12 @@ if __name__ == "__main__":
             """
             Retire the server with the id specified. This should block until
             the server can tell another server of its retirement
-            """ 
+            """
         if line[0] ==  "joinClient":
             clientId = int(line[1])
             serverId = int(line[2])
             """
-            Start a new client with the id specified and connect it to 
+            Start a new client with the id specified and connect it to
             the server
             """
         if line[0] ==  "breakConnection":
@@ -50,9 +55,9 @@ if __name__ == "__main__":
             """
         if line[0] ==  "stabilize":
             """
-            Block until there are enough Anti-Entropy messages for all values to 
-            propagate through the currently connected servers. In general, the 
-            time that this function blocks for should increase linearly with the 
+            Block until there are enough Anti-Entropy messages for all values to
+            propagate through the currently connected servers. In general, the
+            time that this function blocks for should increase linearly with the
             number of servers in the system.
             """
         if line[0] ==  "printLog":
@@ -69,21 +74,20 @@ if __name__ == "__main__":
             Instruct the client specified to associate the given URL with the given
             songName. This command should block until the client communicates with
             one server.
-            """ 
+            """
         if line[0] ==  "get":
             clientId = int(line[1])
             songName = line[2]
             """
             Instruct the client specified to attempt to get the URL associated with
-            the given songName. The value should then be printed to standard out of 
-            the master script in the format specified in the handout. This command 
+            the given songName. The value should then be printed to standard out of
+            the master script in the format specified in the handout. This command
             should block until the client communicates with one server.
-            """ 
+            """
         if line[0] ==  "delete":
             clientId = int(line[1])
             songName = line[2]
             """
-            Instruct the client to delete the given songName from the playlist. 
+            Instruct the client to delete the given songName from the playlist.
             This command should block until the client communicates with one server.
-            """ 
-        
+            """
