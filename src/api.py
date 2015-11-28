@@ -3,9 +3,13 @@
 from threading import Thread, Lock
 from server    import Server
 from client    import Client
+from message   import Message
 
 servers = {} # list of servers
 clients = {} # list of clients
+
+uid = "Master#0"
+nt  = Network(uid)
 
 def joinServer(server_id):
     # the first server is also the primary
@@ -16,20 +20,26 @@ def joinServer(server_id):
     if TERM_LOG:
         print("Server#", i, " pid:", p.pid, sep="")
 
-    # connect to all other servers in the system
+    # connect to a server in the system
     for index in servers:
         if index != server_id:
-            s.notify(index)
-
-
+            m_create = Message(-1, None, "Creation", None)
+            nt.send_to_server(server_id, m_create)
+            break
 
 
 def retireServer(server_id):
-    pass
+    if servers[server_id]:
+        m_retire = Message(-1, None, "Retire", None)
+        nt.send_to_server(server_id, m_retire)
+        # TODO: block until it is able to tell another server of its retirement
+        servers[server_id] = None
 
 
 def joinClient(client_id, server_id):
-    pass
+    if cliens[client_id] and servers[server_id]:
+        m_join = Message(-1, None, "Join", server_id)
+        nt.send_to_client(client_id, m_join)
 
 
 def breakConnection(id1, id2):

@@ -3,6 +3,7 @@
 import fileinput
 import string
 import subprocess, sys, os, signal, time
+import api
 
 from threading import Thread, Lock
 from network   import Network
@@ -16,12 +17,16 @@ if __name__ == "__main__":
             """
             Start up a new server with this id and connect it to all servers
             """
+            joinServer(serverId)
+
         if line[0] ==  "retireServer":
             serverId = int(line[1])
             """
             Retire the server with the id specified. This should block until
             the server can tell another server of its retirement
             """
+            retireServer(serverId)
+
         if line[0] ==  "joinClient":
             clientId = int(line[1])
             serverId = int(line[2])

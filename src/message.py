@@ -6,10 +6,9 @@ class Message:
 
     '''
     @mtype is the type of the message. It can be either
-           Get, Put, Delete, Write, AntiEntropy;
-           Creation, Creation_Ack
-           If @mtype is Get, Put or Delete, then the message is
-           from a client; otherwise, it is from other severs
+           from client: Get, Put, Delete,
+           from server: Write, AntiEntropy, Creation, Creation_Ack,
+           from master: Retire, Join
     '''
 	def __init__(self, sender, sender_uid, mtype, content):
 		self.sender_id  = sender
