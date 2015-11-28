@@ -2,6 +2,8 @@
 
 import sys, socket, os, signal
 
+from message import Message
+
 TERM_LOG        = True
 DEBUG_SOCKET    = True
 
@@ -39,14 +41,14 @@ class Network:
     def send_to_node(self, dest_id, message):
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect((self.PRIVATE_TCP_IP, self.SERVER_BASE_PORT+dest_id))
+            s.connect((self.PRIVATE_TCP_IP, self.NODE_BASE_PORT+dest_id))
             s.send(str(message).encode('ascii'))
             if TERM_LOG:
-                print(self.uid, " sends ", message, " to Server ", dest_id,
-                  sep="")
+                print(self.uid, " sends (", str(message), ") to Node ", dest_id,
+                      sep="")
         except:
             if DEBUG_SOCKET and TERM_LOG:
-                print(self.uid, "connects to Server", dest_id, "failed")
+                print(self.uid, "connects to Node", dest_id, "failed")
 
     def send_to_master(self, message):
         try:
@@ -54,7 +56,8 @@ class Network:
             s.connect((self.PRIVATE_TCP_IP, self.MASTER_BASE_PORT))
             s.send(message.encode('ascii'))
             if TERM_LOG:
-                print(self.uid, " sends ", message, " to Master ", sep="")
+                print(self.uid, " sends (", str(message), ") to Master ",
+                      sep="")
         except:
             if DEBUG_SOCKET and TERM_LOG:
                 print(self.uid, "connects to Master", dest_id, "failed")
@@ -63,13 +66,20 @@ class Network:
         connection, address = self.server.accept()
         buf = connection.recv(self.BUFFER_SIZE)
         if len(buf) > 0:
-            decode_buf = buf.decode('ascii')
+            decode_buf = buf.decode('ascii').split(' ')
+            sender_id  = decode_buf[0]
+            sender_uid = decode_buf[1] if decode_buf != "None" else None
+            mtype      = decode_buf[2]
+            content    = ' '.join(decode_buf[3:])
+            if content == "None":
+                content = None
+            message = Message(sender_id, sender_uid, mtype, content)
             if TERM_LOG:
-                print(self.uid, " receives ", decode_buf, " from ", address,
+                print(self.uid, " receives (", str(message), ") from ", address,
                   sep="")
         else:
-            decode_buf = ""
-        return decode_buf
+            message = None
+        return message
 
     def shutdown(self):
         self.server.close()

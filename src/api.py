@@ -1,9 +1,14 @@
 #!/usr/bin/python3
 
+import subprocess, sys, os, signal, time
+
 from threading import Thread, Lock
 from server    import Server
 from client    import Client
 from message   import Message
+from network   import Network
+
+TERM_LOG = True
 
 nodes   = [] # list of nodes
 servers = {} # list of servers
@@ -22,8 +27,8 @@ def joinServer(server_id):
         nodes.append(server_id)
         #TODO: wait for ack
         if TERM_LOG:
-            print("Server#", i, " pid:", p.pid, sep="")
-
+            print("Server#", server_id, " pid:", p.pid, sep="")
+        time.sleep(2)
         # connect to a server in the system
         for index in servers:
             if index != server_id:
@@ -50,7 +55,7 @@ def joinClient(client_id, server_id):
             nodes.append(client_id)
             #TODO: wait for ack
             if TERM_LOG:
-                print("Client#", i, " pid:", p.pid, sep="")
+                print("Client#", client_id, " pid:", p.pid, sep="")
 
             m_join = Message(-1, None, "Join", server_id)
             nt.send_to_node(client_id, m_join)

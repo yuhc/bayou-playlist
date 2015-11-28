@@ -7,17 +7,21 @@ import api
 
 from threading import Thread, Lock
 from network   import Network
-from ast       import literal_eval
+
+CMD_DEBUG = True
 
 if __name__ == "__main__":
     for line in fileinput.input():
+        if CMD_DEBUG:
+            print("#", line.strip())
+
         line = line.split()
         if line[0] ==  "joinServer":
             serverId = int(line[1])
             """
             Start up a new server with this id and connect it to all servers
             """
-            joinServer(serverId)
+            api.joinServer(serverId)
 
         if line[0] ==  "retireServer":
             serverId = int(line[1])
@@ -25,7 +29,7 @@ if __name__ == "__main__":
             Retire the server with the id specified. This should block until
             the server can tell another server of its retirement
             """
-            retireServer(serverId)
+            api.retireServer(serverId)
 
         if line[0] ==  "joinClient":
             clientId = int(line[1])
@@ -34,6 +38,8 @@ if __name__ == "__main__":
             Start a new client with the id specified and connect it to
             the server
             """
+            api.joinClient(clientId, serverId)
+
         if line[0] ==  "breakConnection":
             id1 = int(line[1])
             id2 = int(line[2])
@@ -41,6 +47,8 @@ if __name__ == "__main__":
             Break the connection between a client and a server or between
             two servers
             """
+            api.breakConnection(id1, id2)
+
         if line[0] ==  "restoreConnection":
             id1 = int(line[1])
             id2 = int(line[2])
@@ -48,16 +56,22 @@ if __name__ == "__main__":
             Restore the connection between a client and a server or between
             two servers
             """
+            api.restoreConnection(id1, id2)
+
         if line[0] ==  "pause":
             """
             Pause the system and don't allow any Anti-Entropy messages to
             propagate through the system
             """
+            api.pause()
+
         if line[0] ==  "start":
             """
             Resume the system and allow any Anti-Entropy messages to
             propagate through the system
             """
+            api.start()
+
         if line[0] ==  "stabilize":
             """
             Block until there are enough Anti-Entropy messages for all values to
@@ -65,12 +79,16 @@ if __name__ == "__main__":
             time that this function blocks for should increase linearly with the
             number of servers in the system.
             """
+            api.stabilize()
+
         if line[0] ==  "printLog":
             serverId = int(line[1])
             """
             Print out a server's operation log in the format specified in the
             handout.
             """
+            api.printLog(serverId)
+
         if line[0] ==  "put":
             clientId = int(line[1])
             songName = line[2]
@@ -80,6 +98,8 @@ if __name__ == "__main__":
             songName. This command should block until the client communicates with
             one server.
             """
+            api.put(clientId, songName, URL)
+
         if line[0] ==  "get":
             clientId = int(line[1])
             songName = line[2]
@@ -89,6 +109,8 @@ if __name__ == "__main__":
             the master script in the format specified in the handout. This command
             should block until the client communicates with one server.
             """
+            api.get(clientId, songName)
+
         if line[0] ==  "delete":
             clientId = int(line[1])
             songName = line[2]
@@ -96,3 +118,6 @@ if __name__ == "__main__":
             Instruct the client to delete the given songName from the playlist.
             This command should block until the client communicates with one server.
             """
+            api.delete(clientId, songName)
+
+    api.exit()

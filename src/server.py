@@ -1,11 +1,17 @@
 #!/usr/bin/python3
 
-import sys
+import sys, string
+
+from network   import Network
+from threading import Thread, Lock
+
+TERM_LOG = True
 
 class Server:
 
     def __init__(self, node_id, is_primary):
         self.node_id    = node_id
+        self.uid        = "Server#" + str(node_id)
         self.unique_id  = (None, node_id)  # replica_id in lecture note
 
         self.is_primary = is_primary # first created server is the primary
@@ -25,23 +31,21 @@ class Server:
 
         # create the network controller
         self.connections = set() # whether could connect
-        self.nt = Network
+        self.nt = Network(self.uid)
         try:
-            t_recv = Thread(target=self.receive)
-            t_recv.daemon = True
-            t_recv.start()
+            self.t_recv = Thread(target=self.receive)
+            self.t_recv.daemon = True
+            self.t_recv.start()
         except:
-            print(uid, "error: unable to start new thread")
+            print(self.uid, "error: unable to start new thread")
 
     def receive(self):
         while 1:
-            buf = nt.receive()
-            if len(buf) > 0:
+            buf = self.nt.receive()
+            if buf:
                 if TERM_LOG:
-                    print(uid, "handles", buf)
-                buf = literal_eval(buf)
-                if buf[0] == 'allCleared':
-                    waitfor_clear.remove(buf[1])
+                    print(self.uid, "handles:", str(buf))
+                # TODO: parse buf
 
     '''
     notify server @dest_id about its joining. '''
@@ -58,4 +62,7 @@ if __name__ == "__main__":
     cmd = sys.argv
     node_id = int(cmd[1])
     is_primary = (cmd[2] == "True")
-    s = Server(node_id)
+    s = Server(node_id, is_primary)
+    if TERM_LOG:
+        print(s.uid, "started")
+    s.t_recv.join()
