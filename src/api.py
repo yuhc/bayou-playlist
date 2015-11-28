@@ -26,9 +26,10 @@ def joinServer(server_id):
         servers[server_id] = p.pid
         nodes.append(server_id)
         #TODO: wait for ack
+        time.sleep(1)
         if TERM_LOG:
             print("Server#", server_id, " pid:", p.pid, sep="")
-        time.sleep(2)
+
         # connect to a server in the system
         for index in servers:
             if index != server_id:
@@ -54,6 +55,7 @@ def joinClient(client_id, server_id):
             clients[client_id] = p.pid
             nodes.append(client_id)
             #TODO: wait for ack
+            time.sleep(1)
             if TERM_LOG:
                 print("Client#", client_id, " pid:", p.pid, sep="")
 
