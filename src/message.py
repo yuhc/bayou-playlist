@@ -8,7 +8,8 @@ class Message:
     @mtype is the type of the message. It can be either
            from client: Get, Put, Delete,
            from server: Write, AntiEntropy, Creation, Creation_Ack,
-           from master: Retire, Join
+           from master: Retire, Join, Break, Restore, Pause, Start, Print, Put,
+                        Get, Delete
     '''
 	def __init__(self, sender, sender_uid, mtype, content):
 		self.sender_id  = sender

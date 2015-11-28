@@ -15,6 +15,8 @@ class Server:
         self.version_vector = {} # <server, clock>
         self.version_vector[self.unique_id] = 1
 
+        self.playlist = {}
+
         self.CSN = 0            # commit sequence number
         self.accept_time = 0
 
