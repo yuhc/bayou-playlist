@@ -125,3 +125,17 @@ def delete(client_id, song_name):
         m_delete = Message(-1, None, "Delete", song_name)
         nt.send_to_node(client_id, m_delete)
         # TODO: block
+
+def exit():
+    # kill the remained nodes and clients
+    for i in servers:
+        if servers[i] != None:
+            os.kill(servers[i], signal.SIGKILL)
+            if TERM_LOG:
+                print("Servers#", i, " stopped", sep="")
+    for i in clients:
+        if clients[i] != None:
+            os.kill(clients[i], signal.SIGKILL)
+            if TERM_LOG:
+                print("Clients#", i, " stopped", sep="")
+    sys.exit()
