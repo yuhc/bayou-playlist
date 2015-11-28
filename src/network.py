@@ -2,7 +2,8 @@
 
 import sys, socket, os, signal
 
-from message import Message
+from ast     import literal_eval
+from message import Message, AntiEntropy, Write
 
 TERM_LOG        = True
 DEBUG_SOCKET    = True
@@ -35,8 +36,8 @@ class Network:
         self.server.bind((self.PRIVATE_TCP_IP, TCP_PORT))
         self.server.listen(128)
         if TERM_LOG:
-            print(uid, " socket ", self.PRIVATE_TCP_IP, ":", TCP_PORT, " started",
-              sep="")
+            print(uid, " socket ", self.PRIVATE_TCP_IP, ":", TCP_PORT,
+                  " started", sep="")
 
     def send_to_node(self, dest_id, message):
         try:
@@ -44,7 +45,7 @@ class Network:
             s.connect((self.PRIVATE_TCP_IP, self.NODE_BASE_PORT+dest_id))
             s.send(str(message).encode('ascii'))
             if TERM_LOG:
-                print(self.uid, " sends (", str(message), ") to Node ", dest_id,
+                print(self.uid, " sends ", str(message), " to Node ", dest_id,
                       sep="")
         except:
             if DEBUG_SOCKET and TERM_LOG:
@@ -56,7 +57,7 @@ class Network:
             s.connect((self.PRIVATE_TCP_IP, self.MASTER_BASE_PORT))
             s.send(message.encode('ascii'))
             if TERM_LOG:
-                print(self.uid, " sends (", str(message), ") to Master ",
+                print(self.uid, " sends ", str(message), " to Master ",
                       sep="")
         except:
             if DEBUG_SOCKET and TERM_LOG:
@@ -66,16 +67,25 @@ class Network:
         connection, address = self.server.accept()
         buf = connection.recv(self.BUFFER_SIZE)
         if len(buf) > 0:
-            decode_buf = buf.decode('ascii').split(' ')
-            sender_id  = decode_buf[0]
-            sender_uid = decode_buf[1] if decode_buf != "None" else None
-            mtype      = decode_buf[2]
-            content    = ' '.join(decode_buf[3:])
-            if content == "None":
-                content = None
-            message = Message(sender_id, sender_uid, mtype, content)
+            decode_buf = buf.decode('ascii')
+            buf        = literal_eval(decode_buf)
+            if buf[0] == "Message":
+                (sender_id, sender_uid, mtype, content)  = buf[1:]
+                message = Message(sender_id, sender_uid, mtype, content)
+            elif buf[0] == "AntiEntropy":
+                (sender_id, ver_vector, csn, committed_log, tentative_log) = \
+                    buf[1:]
+                message = AntiEntropy(sender_id, ver_vector, csn, committed_log,
+                                      tentative_log)
+            elif buf[0] == "Write":
+                (sender_id, mtype, csn, accept_time, content) = buf[1:]
+                message = Write(sender_id, mtype, csn, accept_time, content)
+            else:
+                if TERM_LOG:
+                    print(self.uid, "receives unrecognized message:",
+                          decode_buf)
             if TERM_LOG:
-                print(self.uid, " receives (", str(message), ") from ", address,
+                print(self.uid, " receives ", str(message), " from ", address,
                   sep="")
         else:
             message = None
