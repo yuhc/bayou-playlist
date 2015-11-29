@@ -3,9 +3,10 @@
 import string, sys
 
 from network   import Network
-from threading import Thread, Lock
+from threading import Thread, Lock, Condition
 
 TERM_LOG = True
+c_send_to_server = Condition()
 
 class Client:
 
@@ -18,6 +19,7 @@ class Client:
         # create the network controller
         self.connected_server # which server is connected
         self.nt = Network(self.uid)
+        self.can_send_to_server = True
         try:
             self.t_recv = Thread(target=self.receive)
             self.t_recv.daemon = True
@@ -36,15 +38,33 @@ class Client:
                 if buf.mtype == "Put":
                     w = Write(self.node_id, "Put", None, None, buf.content)
                     m_put = Message(self.node_id, None, "Write", w)
+                    c_can_send_to_server.acquire()
+                    while True:
+                        if self.can_send_to_server:
+                            break
+                        c_can_send_to_server.wait()
+                    c_can_send_to_server.release()
                     self.nt.send_to_node(self.connected_server, m_put)
 
                 elif buf.mtype == "Get":
                     m_get = Message(self.node_id, None, "Get", buf.content)
+                    c_can_send_to_server.acquire()
+                    while True:
+                        if self.can_send_to_server:
+                            break
+                        c_can_send_to_server.wait()
+                    c_can_send_to_server.release()
                     self.nt.send_to_node(self.connected_server, m_put)
 
                 elif buf.mtype == "Delete":
                     w = Write(self.node_id, "Delete", None, None, buf.content)
                     m_delete = Message(self.node_id, None, "Write", w)
+                    c_can_send_to_server.acquire()
+                    while True:
+                        if self.can_send_to_server:
+                            break
+                        c_can_send_to_server.wait()
+                    c_can_send_to_server.release()
                     self.nt.send_to_node(self.connected_server, m_delete)
 
                 elif buf.mtype == "GetAck":
@@ -54,7 +74,18 @@ class Client:
                     else:
                         self.read_set = server_CSN
                         print song_name+":"+song_url
-                    
+
+                elif buf.mtype == "Break":
+                    c_can_send_to_server.acquire()
+                    self.can_send_to_server = False
+                    c_can_send_to_server.release()
+
+                elif buf.mtype == "Restore":
+                    c_can_send_to_server.acquire()
+                    self.can_send_to_server = True
+                    c_can_send_to_server.notify()
+                    c_can_send_to_server.release()
+
 
 if __name__ == "__main__":
     cmd= sys.argv
