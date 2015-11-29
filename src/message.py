@@ -8,8 +8,9 @@ class Message:
     @mtype is the type of the message. It can be either
            TODO: rewrite this comment
            from client: Get, Put, Delete,
-           from server: Write, RequestAntiEn, AntiEntropy, AntiEn_Ack, Creation,
-                        Creation_Ack, CommitNofiy
+           from server: Write, RequestAntiEn, AntiEntropy, AntiEn_Ack,
+                        AntiEn_Finsh, Creation,
+                        Creation_Ack
            from master: Retire, Join, Break, Restore, Pause, Start, Print, Put,
                         Get, Delete
     '''

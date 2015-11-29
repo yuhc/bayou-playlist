@@ -10,12 +10,38 @@ from network   import Network
 
 TERM_LOG = True
 
+STABILIZE_TIME = 2
+
 nodes   = [] # list of nodes
 servers = {} # list of servers
 clients = {} # list of clients
 
+has_received_log = False
+has_received_res = False
+
 uid = "Master#0"
 nt  = Network(uid)
+try:
+    self.t_recv = Thread(target=receive)
+    self.t_recv.daemon = True
+    self.t_recv.start()
+except:
+    print(self.uid, "error: unable to start new thread")
+
+def receive(self):
+    while 1:
+        buf = self.nt.receive()
+        if buf:
+            if TERM_LOG:
+                print(self.uid, "handles:", str(buf))
+
+            if buf.mtype == "Playlist":
+                print(buf.content)
+                has_received_log = True
+            if buf.mtype == "Result":
+                print(buf.result)
+                has_received_res = True
+
 
 def joinServer(server_id):
     if not server_id in nodes:
@@ -79,9 +105,15 @@ def breakConnection(id1, id2):
 
 def restoreConnection(id1, id2):
     if id1 in nodes and id2 in nodes:
-        m_break = Message(-1, None, "Restore", id1)
+        if id1 in server_list:
+            m_break = Message(-1, None, "Restore", ("Server", id1))
+        else:
+            m_break = Message(-1, None, "Restore", ("Client", id1))
         nt.send_to_node(id2, m_break)
-        m_break = Message(-1, None, "Restore", id2)
+        if id2 in server_list:
+            m_break = Message(-1, None, "Restore", ("Server", id2))
+        else:
+            m_break = Message(-1, None, "Restore", ("Client", id2))
         nt.send_to_node(id1, m_break)
 
 
@@ -98,35 +130,44 @@ def start():
 
 
 def stabilize():
-    pass
+    time.sleep(STABILIZE_TIME*len(server_list))
 
 
 def printLog(server_id):
     if server_id in servers:
         m_print = Message(-1, None, "Print", None)
+        has_received_log = False
         nt.send_to_node(server_id, m_print)
-        # TODO: block to wait
+        while !has_received_log:
+            pass
 
 
 def put(client_id, song_name, url):
     if client_id in clients:
         m_put = Message(-1, None, "Put", song_name + ' ' + url)
+        has_received_res = False
         nt.send_to_node(client_id, m_put)
-        # TODO: block
+        while !has_received_res:
+            pass
 
 
 def get(client_id, song_name):
     if client_id in clients:
         m_get = Message(-1, None, "Get", song_name)
+        has_received_res = False
         nt.send_to_node(client_id, m_get)
-        # TODO: block
+        while !has_received_res:
+            pass
 
 
 def delete(client_id, song_name):
     if client_id in clients:
         m_delete = Message(-1, None, "Delete", song_name)
+        has_received_res = False
         nt.send_to_node(client_id, m_delete)
-        # TODO: block
+        while !has_received_res:
+            pass
+
 
 def exit():
     # kill the remained nodes and clients

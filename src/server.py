@@ -76,7 +76,7 @@ class Server:
                                            "Creation_Ack", self.accept_time)
                     self.nt.send_to_node(buf.sender_id, m_create_ack)
 
-                if buf.mtype == "Creation_Ack":
+                elif buf.mtype == "Creation_Ack":
                     # buf.content contains sender's accept_time
                     c_create.acquire()
                     self.unique_id   = (buf.content, buf.unique_id)
@@ -84,7 +84,7 @@ class Server:
                     c_create.notify()
                     c_create.release()
 
-                if buf.mtype == "RequestAntiEn":
+                elif buf.mtype == "RequestAntiEn":
                     self.c_antientropy.acquire()
                     a_ack = AntiEntropy(self.node_id, self.version_vector,
                                         self.CSN, self.committed_log,
@@ -93,14 +93,42 @@ class Server:
                                                  "AntiEn_Ack", a_ack)
                     self.nt.send_to_node(buf.sender_id, m_anti_entropy_ack)
 
-                if buf.mtype == "AntiEn_Ack":
+                elif buf.mtype == "AntiEn_Ack":
                     self.c_request_antientropy.acquire()
                     self.m_anti_entropy = buf.content
                     self.c_request_antientropy.notify()
                     self.c_request_antientropy.release()
 
-                if buf.mtype == "AntiEn_Finsh":
+                elif buf.mtype == "AntiEn_Finsh":
                     self.c_antientropy.release()
+
+                # from master
+                elif buf.mtype == "Break":
+                    self.server_list.remove(buf.content)
+                    self.client_list.remove(buf.content)
+
+                elif buf.mtype == "Restore":
+                    if buf.content[0] == "Server":
+                        self.server_list.append(buf.content[1])
+                    else:
+                        self.client_list.append(buf.content[2])
+
+                elif buf.mtype == "Pause":
+                    self.is_paused = True
+
+                elif buf.mtype == "Start":
+                    self.is_paused = False
+
+                elif buf.mtype == "Print":
+                    self.printLog()
+
+                elif buf.mtype == "Write":
+                    c_antientropy.acquire()
+                    if buf.sender_id in server_list:
+                        self.receive_server_writes(buf.content)
+                    else:
+                        self.receive_client_writes(buf.content)
+                    c_antientropy.release()
 
     '''
     Notify server @dest_id about its joining. '''
@@ -198,9 +226,9 @@ class Server:
     Receive_Writes in paper Bayou, client part. '''
     def receive_client_writes(w):
         self.accept_time = max(self.accept_time+1, w.accept_time) # BUG?
-        w.sender = self.node_id
-        w.accept_time = self.accept_time
-        w.wid = (self.accept_time, self.node_id)
+        w.sender         = self.node_id
+        w.accept_time    = self.accept_time
+        w.wid            = (self.accept_time, self.node_id)
         self.tentative_log.append(w)
         self.bayou_write(w)
 
@@ -270,6 +298,24 @@ class Server:
         else:
             self.tentative_log.append(w)
         self.history.append(playlist)
+
+    '''
+    Print playlist and send it to master. '''
+    def printLog():
+        plog = ""
+        for wx in self.committed_log:
+            if wx.mtype == "Put":
+                plog = plog + "PUT:(" + wx.content + "):TRUE\n"
+            elif wx.mtype == "Delete":
+                plog = plog + "DELETE:(" + wx.content _ "):TRUE\n"
+        for wx in self.tentative_log:
+            if wx.mtype == "Put":
+                plog = plog + "PUT:(" + wx.content + "):FALSE\n"
+            elif wx.mtype == "Delete":
+                plog = plog + "DELETE:(" + wx.content _ "):FALSE\n"
+
+        m_log = Message(self.node_id, None, "Playlist", plog)
+        self.nt.send_to_master(m_log)
 
     def __str__(self):
         return "Server #" + self.node_id + "#" + self.unique_id

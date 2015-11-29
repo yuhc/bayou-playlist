@@ -16,7 +16,7 @@ class Client:
         self.read_set = -1 # session guarantees
 
         # create the network controller
-        self.connections = set() # whether could connect
+        self.connected_server # which server is connected
         self.nt = Network(self.uid)
         try:
             self.t_recv = Thread(target=self.receive)
@@ -32,6 +32,15 @@ class Client:
                 if TERM_LOG:
                     print(self.uid, "handles:", str(buf))
                 # TODO: parse buf
+
+                if buf.mtype == "Put":
+                    w = Write(self.node_id, "Put", None, None, buf.content)
+                    m_put = Message(self.node_id, None, "Write", w)
+                    self.nt.send_to_node(self.connected_server, m_put)
+
+                elif buf.mtype == "Get":
+
+                elif buf.mtype == "Delete":
 
 if __name__ == "__main__":
     cmd= sys.argv
