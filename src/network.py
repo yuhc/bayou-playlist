@@ -72,14 +72,14 @@ class Network:
             if buf[0] == "Message":
                 (sender_id, sender_uid, mtype, content)  = buf[1:]
                 message = Message(sender_id, sender_uid, mtype, content)
-            elif buf[0] == "AntiEntropy":
-                (sender_id, ver_vector, csn, committed_log, tentative_log) = \
-                    buf[1:]
-                message = AntiEntropy(sender_id, ver_vector, csn, committed_log,
+                if content[0] == "AntiEntropy":
+                    (sender_id, ver_vector, csn, committed_log, tentative_log) = \
+                                                                             content[1:]
+                    message.content = AntiEntropy(sender_id, ver_vector, csn, committed_log,
                                       tentative_log)
-            elif buf[0] == "Write":
-                (sender_id, mtype, csn, accept_time, content) = buf[1:]
-                message = Write(sender_id, mtype, csn, accept_time, content)
+                if content[0] == "Write":
+                    (sender_id, mtype, csn, accept_time, content) = content[1:]
+                    message.content = Write(sender_id, mtype, csn, accept_time, content)
             else:
                 if TERM_LOG:
                     print(self.uid, "receives unrecognized message:",

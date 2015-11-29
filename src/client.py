@@ -47,6 +47,15 @@ class Client:
                     m_delete = Message(self.node_id, None, "Write", w)
                     self.nt.send_to_node(self.connected_server, m_delete)
 
+                elif buf.mtype == "GetAck":
+                    (song_name, song_url, server_CSN) = buf.content
+                    if (self.readset > server_CSN):
+                        print song_name+":ERR_DEP"
+                    else:
+                        self.read_set = server_CSN
+                        print song_name+":"+song_url
+                    
+
 if __name__ == "__main__":
     cmd= sys.argv
     node_id = int(cmd[1])
