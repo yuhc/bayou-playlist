@@ -9,10 +9,9 @@ class Message:
            TODO: rewrite this comment
            from client: Get, Put, Delete,
            from server: Write, RequestAntiEn, AntiEntropy, AntiEn_Ack,
-                        AntiEn_Finsh, Creation,
-                        Creation_Ack
-           from master: Retire, Join, Break, Restore, Pause, Start, Print, Put,
-                        Get, Delete
+                        AntiEn_Finsh, Creation, Creation_Ack
+           from master: Retire, Join, Break, Restore, Pause, Start, Print, Get,
+                        Write
     '''
     def __init__(self, sender, sender_uid, mtype, content):
         self.sender_id  = sender
@@ -36,7 +35,7 @@ class AntiEntropy:
     def __init__(self, sender, version_vector, CSN, commit_log=[], tent_log=[]):
         self.sender_id      = sender
         self.version_vector = version_vector
-        self.CSN            = CSN # commit sequence number
+        self.CSN            = CSN        # commit sequence number
         self.committed_log  = commit_log # may be not necessary
         self.tentative_log  = tent_log
 

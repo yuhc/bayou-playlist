@@ -39,8 +39,13 @@ class Client:
                     self.nt.send_to_node(self.connected_server, m_put)
 
                 elif buf.mtype == "Get":
+                    m_get = Message(self.node_id, None, "Get", buf.content)
+                    self.nt.send_to_node(self.connected_server, m_put)
 
                 elif buf.mtype == "Delete":
+                    w = Write(self.node_id, "Delete", None, None, buf.content)
+                    m_delete = Message(self.node_id, None, "Write", w)
+                    self.nt.send_to_node(self.connected_server, m_delete)
 
 if __name__ == "__main__":
     cmd= sys.argv
