@@ -8,7 +8,7 @@ class Message:
     @mtype is the type of the message. It can be either
            TODO: rewrite this comment
            from client: Get, Put, Delete,
-           from server: Write, AntiEntropy, Creation, Creation_Ack,
+           from server: Write, RequestAnti, AntiEntropy, Creation, Creation_Ack,
            from master: Retire, Join, Break, Restore, Pause, Start, Print, Put,
                         Get, Delete
     '''
@@ -37,7 +37,6 @@ class AntiEntropy:
         self.CSN            = CSN # commit sequence number
         self.committed_log  = commit_log
         self.tentative_log  = tent_log
-        self.mtype          = "AntiEntropy"
 
     '''
     Message format:
@@ -61,6 +60,8 @@ class Write:
         self.mtype       = mtype
         self.CSN         = CSN
         self.accept_time = accept_time
+        self.wid         = (accept_time, sender)
+        self.state       = "TENTATIVE" # or "COMMITTED"
         self.content     = content
 
     def is_tentative(self):
