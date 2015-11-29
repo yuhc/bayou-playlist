@@ -207,8 +207,6 @@ class Server:
         S_version_vector = self.version_vector
         S_CSN            = self.CSN
 
-        # TODO: truncation of stable log
-
         # anti-entropy with support for committed writes
         if R_CSN < S_CSN:
             # committed log
