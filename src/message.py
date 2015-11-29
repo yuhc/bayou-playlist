@@ -8,7 +8,8 @@ class Message:
     @mtype is the type of the message. It can be either
            TODO: rewrite this comment
            from client: Get, Put, Delete,
-           from server: Write, RequestAnti, AntiEntropy, Creation, Creation_Ack,
+           from server: Write, RequestAntiEn, AntiEntropy, AntiEn_Ack, Creation,
+                        Creation_Ack,
            from master: Retire, Join, Break, Restore, Pause, Start, Print, Put,
                         Get, Delete
     '''
@@ -31,11 +32,11 @@ class Message:
                     self.content))
 
 class AntiEntropy:
-    def __init__(self, sender, version_vector, CSN, commit_log, tent_log):
+    def __init__(self, sender, version_vector, CSN, commit_log=[], tent_log=[]):
         self.sender_id      = sender
         self.version_vector = version_vector
         self.CSN            = CSN # commit sequence number
-        self.committed_log  = commit_log
+        self.committed_log  = commit_log # may be not necessary
         self.tentative_log  = tent_log
 
     '''

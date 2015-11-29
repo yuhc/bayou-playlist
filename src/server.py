@@ -3,7 +3,7 @@
 import sys, string, random
 
 from network   import Network
-from threading import Thread, Lock
+from threading import Thread, Lock, Conditon
 
 TERM_LOG = True
 
@@ -14,27 +14,28 @@ class Server:
     def __init__(self, node_id, is_primary):
         self.node_id    = node_id
         self.uid        = "Server#" + str(node_id)
-        self.unique_id  = (None, node_id)  # replica_id in lecture note
+        self.unique_id  = (1, 0)  # replica_id in lecture note, <clock, id>
 
         self.is_primary = is_primary # first created server is the primary
         self.is_retired = False
         self.is_paused  = False
 
-        self.version_vector = {} # <clock, server>
-        self.version_vector[self.unique_id] = 1
+        self.version_vector = {} # unique_id: accept_time
+        if is_primary:
+            self.version_vector[self.unique_id] = 1
 
-        self.playlist = {}
-        self.history  = []      # list of sets
+        self.playlist = {}      # song_name: url
+        self.history  = []      # list of history playlists
 
         self.CSN = 0            # commit sequence number
-        self.accept_time = 0
+        self.accept_time = 1
 
         self.committed_log = []
-        self.tentative_log = {} # dictionary of lists, index: unique_id
+        self.tentative_log = [] # list of writes
 
         # create the network controller
-        self.connections = set() # whether could connect
         self.server_list = []    # created by Creation Write
+        self.client_list = []    # modified by master
         self.nt = Network(self.uid)
         try:
             self.t_recv = Thread(target=self.receive)
@@ -54,13 +55,44 @@ class Server:
                 if TERM_LOG:
                     print(self.uid, "handles:", str(buf))
                 # TODO: parse buf
+                # update logical clock
+                if isinstance(buf.content, Write):
+                    self.accept_time = max(self.accept_time,
+                                           buf.content.accept_time) + 1
+
+                if buf.mtype == "Creation":
+                    tentative_log.append(buf.content)
+                    server_list.append(buf.content.sender_id)
+                    history.append((playlist, server_list, client_list))
+                    m_create_ack = Message(self.node_id, self.unique_id,
+                                           "Creation_Ack", self.accept_time)
+                    self.nt.send_to_node(buf.sender_id, m_create_ack)
+
+                if buf.mtype == "Creation_Ack":
+                    # buf.content contains sender's accept_time
+                    self.unique_id   = (buf.content, buf.unique_id)
+                    self.accept_time = buf.content + 1
+                    c_create.notify()
+
+                if buf.mtype == "RequestAntiEn":
+                    a_ack = AntiEntropy(self.node_id, self.version_vector,
+                                        self.CSN)
+                    m_anti_entropy_ack = Message(self.node_id, self.unique_id,
+                                                 "AntiEn_Ack", a_ack)
+                    self.nt.send_to_node(buf.sender_id, m_anti_entropy_ack)
+
+                if buf.mtype == "AntiEn_Ack":
+                    self.m_anti_entropy = buf.content
+                    c_request_antientropy.notify()
 
     '''
     Notify server @dest_id about its joining. '''
     def notify(self, dest_id):
-        m_join_server = Message(server_id, None, "Creation", None)
+        w_write = Write(self.node_id, "Creation", 0, 1, None)
+        m_join_server = Message(self.node_id, None, "Creation", w_write)
         self.nt.send_to_server(dest_id, m_join_server)
-        # TODO: while wait-for-ack
+        global c_create = Condition()
+        c_create.wait()
 
     '''
     Process Anti-Entropy periodically. '''
@@ -73,12 +105,12 @@ class Server:
     Process a received message of type of AntiEntropy. Stated in the paper
     Flexible Update Propagation '''
     def anti_entropy(receiver_id):
-        m_request_anti = Message(self.node_id, self.unique_id, "RequestAnti",
+        m_request_anti = Message(self.node_id, self.unique_id, "RequestAntiEn",
                                  None)
         self.block_request_anti = True
         self.nt.send_to_node(receiver_id, m_request_anti)
-        while self.block_request_anti:
-            pass
+        global c_request_antientropy = Condition()
+        c_request_antientropy.wait()
 
         m_anti_entropy = self.m_anti_entropy
 
@@ -147,7 +179,6 @@ class Server:
             # roll forward
             for wx in suffix_committed_log:
                 # TODO: bayou_write()
-
 
         else:
             # TODO: tentative rollback
