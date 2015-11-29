@@ -122,6 +122,16 @@ class Server:
                 elif buf.mtype == "Print":
                     self.printLog()
 
+                elif buf.mtype == "Get":
+                    song_name = buf.content
+                    try:
+                        song_url  = self.playlist[song_name]
+                    except:
+                        song_url  = "ERR_KEY"
+                    m_get = Message(self.node_id, self.unique_id, "GetAck",
+                                    (song_name, song_url, self.CSN))
+                    self.nt.send_to_node(buf.sender_id, m_get)
+
                 elif buf.mtype == "Write":
                     c_antientropy.acquire()
                     if buf.sender_id in server_list:
