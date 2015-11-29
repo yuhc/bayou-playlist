@@ -9,7 +9,7 @@ class Message:
            TODO: rewrite this comment
            from client: Get, Put, Delete,
            from server: Write, RequestAntiEn, AntiEntropy, AntiEn_Ack, Creation,
-                        Creation_Ack,
+                        Creation_Ack, CommitNofiy
            from master: Retire, Join, Break, Restore, Pause, Start, Print, Put,
                         Get, Delete
     '''
@@ -63,7 +63,7 @@ class Write:
         self.accept_time = accept_time
         self.wid         = (accept_time, sender)
         self.state       = "TENTATIVE" # or "COMMITTED"
-        self.content     = content
+        self.content     = content     # content is a string
 
     def is_tentative(self):
         return not self.is_notice() and self.CSN < 0

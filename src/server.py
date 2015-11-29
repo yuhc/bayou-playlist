@@ -9,7 +9,11 @@ TERM_LOG = True
 
 class Server:
 
-    ANTI_ENTROPY_TIME = 2
+    ANTI_ENTROPY_TIME   = 2
+    PRIMARY_COMMIT_TIME = 2
+    c_create = Condition()
+    c_request_antientropy = Condition()
+    c_antientropy = Lock()
 
     def __init__(self, node_id, is_primary):
         self.node_id    = node_id
@@ -48,6 +52,10 @@ class Server:
         random.seed()
         threading.Timer(self.ANTI_ENTROPY_TIME, self.timer_anti_entropy).start()
 
+        if is_primary:
+            threading.Timer(self.PRIMARY_COMMIT_TIME,
+                            self.timer_primary_commit).start()
+
     def receive(self):
         while 1:
             buf = self.nt.receive()
@@ -70,36 +78,70 @@ class Server:
 
                 if buf.mtype == "Creation_Ack":
                     # buf.content contains sender's accept_time
+                    c_create.acquire()
                     self.unique_id   = (buf.content, buf.unique_id)
                     self.accept_time = buf.content + 1
                     c_create.notify()
+                    c_create.release()
 
                 if buf.mtype == "RequestAntiEn":
+                    self.c_antientropy.acquire()
                     a_ack = AntiEntropy(self.node_id, self.version_vector,
-                                        self.CSN)
+                                        self.CSN, self.committed_log,
+                                        self.tentative_log)
                     m_anti_entropy_ack = Message(self.node_id, self.unique_id,
                                                  "AntiEn_Ack", a_ack)
                     self.nt.send_to_node(buf.sender_id, m_anti_entropy_ack)
 
                 if buf.mtype == "AntiEn_Ack":
+                    self.c_request_antientropy.acquire()
                     self.m_anti_entropy = buf.content
-                    c_request_antientropy.notify()
+                    self.c_request_antientropy.notify()
+                    self.c_request_antientropy.release()
+
+                if buf.mtype == "AntiEn_Finsh":
+                    self.c_antientropy.release()
 
     '''
     Notify server @dest_id about its joining. '''
     def notify(self, dest_id):
         w_write = Write(self.node_id, "Creation", 0, 1, None)
         m_join_server = Message(self.node_id, None, "Creation", w_write)
-        self.nt.send_to_server(dest_id, m_join_server)
-        global c_create = Condition()
-        c_create.wait()
+        self.nt.send_to_node(dest_id, m_join_server)
+        self.c_create.acquire()
+        while True:
+            if self.accept_time != 1:
+                break
+            self.c_create.wait()
+        self.c_create.release()
 
     '''
     Process Anti-Entropy periodically. '''
     def timer_anti_entropy(self):
+        c_antientropy.acquire()
         rand_index = random.randint(0, len(self.server_list)-1)
+        while self.server_list[rand_index] == self.node_id:
+            rand_index = random.randint(0, len(self.server_list)-1)
         self.anti_entropy(self.server_list[rand_index])
+
+        m_finish = Message(self.node_id, self.unique_id, "AntiEn_Finsh", None)
+        self.nt.send_to_node(self.server_list[rand_index], m_finish)
+
         threading.Timer(self.ANTI_ENTROPY_TIME, self.timer_anti_entropy).start()
+        c_antientropy.release()
+
+    '''
+    Primary commits periodically. '''
+    def timer_primary_commit(self):
+        c_antientropy.acquire()
+        for wx in self.tentative_log:
+            wx.state = "COMMITTED"
+            self.receive_server_writes(wx)
+        self.tentative_log = []
+        c_antientropy.release()
+
+        threading.Timer(self.PRIMARY_COMMIT_TIME,
+                        self.timer_primary_commit).start()
 
     '''
     Process a received message of type of AntiEntropy. Stated in the paper
@@ -109,8 +151,11 @@ class Server:
                                  None)
         self.block_request_anti = True
         self.nt.send_to_node(receiver_id, m_request_anti)
-        global c_request_antientropy = Condition()
-        c_request_antientropy.wait()
+        self.c_request_antientropy.acquire()
+        while True:
+            if self.m_anti_entropy:
+                break
+            self.c_request_antientropy.wait()
 
         m_anti_entropy = self.m_anti_entropy
 
@@ -123,20 +168,20 @@ class Server:
         # information of sender (self)
         S_version_vector = self.version_vector
         S_CSN            = self.CSN
-        S_committed_log  = self.committed_log
-        S_tentative_log  = self.tentative_log
 
         # TODO: truncation of stable log
 
         # anti-entropy with support for committed writes
         if R_CSN < S_CSN:
             # committed log
-            for w in S_committed_log:
-                if w in R_committed_log or w in R_tentative_log:
-                    continue
+            for index in [R_CSN+1:len(S_committed_log)]:
+            # for w in S_committed_log:
+                # if w in R_committed_log or w in R_tentative_log:
+                #    continue
+                w = S_committed_log[index]
                 if w.accept_time <= R_version_vector[w.sender_id]:
-                    m_commit = Message(self.node_id, self.unique_id, "Commit",
-                                       w)
+                    m_commit = Message(self.node_id, self.unique_id,
+                                       "Write", w)
                     self.nt.send_to_node(receiver_id, m_commit)
                 else:
                     m_write = Message(self.node_id, self.unique_id, "Write", w)
@@ -147,6 +192,8 @@ class Server:
                 m_write = Message(self.node_id, self.unique_id, "Write", w)
                 self.nt.send_to_node(receiver_id, m_write)
 
+        self.c_request_antientropy.release()
+
     '''
     Receive_Writes in paper Bayou, client part. '''
     def receive_client_writes(w):
@@ -155,7 +202,7 @@ class Server:
         w.accept_time = self.accept_time
         w.wid = (self.accept_time, self.node_id)
         self.tentative_log.append(w)
-        # TODO: bayou_write()
+        self.bayou_write(w)
 
     def receive_server_writes(w):
         if w.state == "COMMITTED":
@@ -175,18 +222,54 @@ class Server:
                 self.history  = self.history[:insert_point-1]
                 self.committed_log = self.committed_log[:insert_point-1]
             # insert w
-            # TODO: bayou_write()
+            self.bayou_write(w)
             # roll forward
             for wx in suffix_committed_log:
-                # TODO: bayou_write()
+                self.bayou_write(wx)
+            # tentative roll forward
+            self.tentative_log.remove(w)
+            for wx in self.tentative_log:
+                self.bayou_write(wx)
 
         else:
-            # TODO: tentative rollback
+            insert_point = len(self.tentative_log)
+            for i in range(len(self.tentative_log)):
+                if tentative_log[i].wid > w.wid:
+                    insert_point = i
+                    break
+            # rollback
+            total_point = insert_point + len(self.committed_log)
+            suffix_tentative_log = self.tentative_log[insert_point:]
+            if total_point == 0:
+                self.playlist = set()
+                self.history = []
+            else:
+                self.playlist = self.history[total_point-1]
+                self.history  = self.history[:total_point-1]
+            if insert_point == 0:
+                self.tentative_log = []
+            else:
+                self.tentative_log = self.tentative_log[:insert_point-1]
+            # insert w
+            self.bayou_write(w)
+            # roll forward
+            self.tentative_log.remove(w)
+            for wx in self.tentative_log:
+                self.bayou_write(wx)
 
     '''
     Bayou_Write in paper Bayou. '''
-    def bayou_write(self):
-        pass
+    def bayou_write(self, w):
+        if w.mtype == "Put":
+            cmd = w.content.split(' ')
+            self.playlist[cmd[0]] = cmd[1]
+        elif w.mtype == "Delete":
+            self.playlist.pop(cmd)
+        if w.state == "COMMITTED":
+            self.committed_log.append(w)
+        else:
+            self.tentative_log.append(w)
+        self.history.append(playlist)
 
     def __str__(self):
         return "Server #" + self.node_id + "#" + self.unique_id
