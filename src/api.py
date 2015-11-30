@@ -8,7 +8,8 @@ from client    import Client
 from message   import Message
 from network   import Network
 
-TERM_LOG = True
+TERM_LOG  = False
+CMD_DEBUG = True
 
 STABILIZE_TIME = 2
 
@@ -34,13 +35,13 @@ def receive(self):
         buf = self.nt.receive()
         if buf:
             if TERM_LOG:
-                print(self.uid, "handles:", str(buf))
+                print(uid, "handles:", str(buf))
 
             if buf.mtype == "Playlist":
-                print(buf.content)
+                print(uid, buf.content)
                 has_received_log = True
             elif buf.mtype == "MGetAck":
-                print(buf.content)
+                print(uid, buf.content)
                 has_received_res = True
             elif buf.mtype == "Done": # done processing put/delete
                 has_received_res = True
@@ -182,10 +183,10 @@ def exit():
         if servers[i] != None:
             os.kill(servers[i], signal.SIGKILL)
             if TERM_LOG:
-                print("Servers#", i, " stopped", sep="")
+                print("Server#", i, " stopped", sep="")
     for i in clients:
         if clients[i] != None:
             os.kill(clients[i], signal.SIGKILL)
             if TERM_LOG:
-                print("Clients#", i, " stopped", sep="")
+                print("Client#", i, " stopped", sep="")
     sys.exit()

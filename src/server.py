@@ -6,7 +6,7 @@ from network   import Network
 from threading import Thread, Lock, Condition
 from message   import AntiEntropy, Write, Message
 
-TERM_LOG = True
+TERM_LOG = False
 
 class Server:
 
@@ -48,13 +48,18 @@ class Server:
         except:
             print(self.uid, "error: unable to start new thread")
 
+        if is_primary:
+            self.accept_time = self.accept_time + 1
+            w_create = Write(self.node_id, self.unique_id, "Creation", None,
+                             self.accept_time, self.unique_id)
+            self.bayou_write(w_create)
+            threading.Timer(self.PRIMARY_COMMIT_TIME,
+                            self.timer_primary_commit).start()
+
         # start Anti-Entropy
         random.seed()
         threading.Timer(self.ANTI_ENTROPY_TIME, self.timer_anti_entropy).start()
 
-        if is_primary:
-            threading.Timer(self.PRIMARY_COMMIT_TIME,
-                            self.timer_primary_commit).start()
 
     def receive(self):
         while 1:
@@ -73,10 +78,8 @@ class Server:
                     if buf.sender_id < 0:
                         try:
                             Thread(target=self.notify,args=(buf.content,)).start()
-                            print("successful")
                         except:
                             print(self.uid, "error: unable to start new thread")
-                        print("finish creation of thread")
                     else:
                         self.tentative_log.append(buf.content)
                         self.server_list.append(buf.content.sender_id)
@@ -88,6 +91,8 @@ class Server:
 
                 elif buf.mtype == "Creation_Ack":
                     # buf.content contains sender's accept_time
+                    if TERM_LOG:
+                            print(self.uid, "tries to acquire a c_antientropy lock in receive.Creation_Ack")
                     self.c_create.acquire()
                     if TERM_LOG:
                         print(self.uid, "acquires a c_create lock in receive.Creation_Ack")
@@ -111,6 +116,8 @@ class Server:
                     self.c_antientropy.release()
 
                 elif buf.mtype == "RequestAntiEn":
+                    if TERM_LOG:
+                            print(self.uid, "tries to acquire a c_antientropy lock in receive.RequestAntiEn")
                     self.c_antientropy.acquire()
                     if TERM_LOG:
                         print(self.uid, "acquires a c_antientropy lock in receive.RequestAntiEn")
@@ -125,6 +132,8 @@ class Server:
                        self.c_antientropy.release()
 
                 elif buf.mtype == "AntiEn_Ack":
+                    if TERM_LOG:
+                            print(self.uid, "tries to acquire a c_antientropy lock in receive.AntiEn_Ack")
                     self.c_request_antientropy.acquire()
                     if TERM_LOG:
                         print(self.uid, "acquires a c_antientropy lock in receive.AntiEn_Ack")
@@ -168,9 +177,7 @@ class Server:
                     self.nt.send_to_node(buf.sender_id, m_get)
 
                 elif buf.mtype == "Write":
-                    self.c_antientropy.acquire()
-                    if TERM_LOG:
-                        print(self.uid, "acquires a c_antientropy lock in receive.Write")
+                    print(self.server_list)
                     if buf.sender_id in self.server_list:
                         if TERM_LOG:
                             print(self.uid, " receives a write from Server#",
@@ -178,12 +185,17 @@ class Server:
                         self.receive_server_writes(buf.content)
                     else:
                         if TERM_LOG:
+                                print(self.uid, "tries to acquire a c_antientropy lock in receive.Write.Client")
+                        self.c_antientropy.acquire()
+                        if TERM_LOG:
+                                print(self.uid, "acquires a c_antientropy lock in receive.Write.Client")
+                        if TERM_LOG:
                             print(self.uid, " receives a write from Client#",
                                   buf.sender_id, sep="")
                         self.receive_client_writes(buf.content)
-                    self.c_antientropy.release()
-                    if TERM_LOG:
-                        print(self.uid, "releases a c_antientropy lock in receive.Write")
+                        self.c_antientropy.release()
+                        if TERM_LOG:
+                            print(self.uid, "releases a c_antientropy lock in receive.Write.Client")
                     done = Message(self.node_id, None, "Done", None)
                     self.nt.send_to_master(done)
 
@@ -383,7 +395,10 @@ class Server:
             self.playlist[cmd[0]] = cmd[1]
         elif w.mtype == "Delete":
             self.playlist.pop(cmd)
+        elif w.mtype == "Creation":
+            self.server_list.append(w.content)
         elif w.mtype == "Retirement":
+            self.server_list.remove(w.sender_id)
             self.version_vector.pop(w.content)
         if w.state == "COMMITTED":
             self.committed_log.append(w)

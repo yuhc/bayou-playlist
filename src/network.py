@@ -5,8 +5,8 @@ import sys, socket, os, signal
 from ast     import literal_eval
 from message import Message, AntiEntropy, Write
 
-TERM_LOG        = True
-DEBUG_SOCKET    = True
+TERM_LOG        = False
+DEBUG_SOCKET    = False
 
 class Network:
 

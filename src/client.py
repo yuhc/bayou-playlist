@@ -6,7 +6,8 @@ from network   import Network
 from threading import Thread, Lock, Condition
 from message   import AntiEntropy, Write, Message
 
-TERM_LOG = True
+TERM_LOG = False
+
 c_can_send_to_server = Condition()
 
 class Client:

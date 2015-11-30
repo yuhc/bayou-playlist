@@ -8,11 +8,10 @@ import api
 from threading import Thread, Lock
 from network   import Network
 
-CMD_DEBUG = True
 
 if __name__ == "__main__":
     for line in fileinput.input():
-        if CMD_DEBUG:
+        if api.CMD_DEBUG:
             print("#", line.strip())
 
         line = line.split()
