@@ -8,7 +8,7 @@ from client    import Client
 from message   import Message
 from network   import Network
 
-TERM_LOG  = False
+TERM_LOG  = True
 CMD_DEBUG = True
 
 STABILIZE_TIME = 2

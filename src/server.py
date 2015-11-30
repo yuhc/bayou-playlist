@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import sys, string, random, threading
+import sys, string, random, threading, copy
 
 from network   import Network
 from threading import Thread, Lock, Condition
@@ -38,8 +38,8 @@ class Server:
         self.tentative_log = [] # list of writes
 
         # create the network controller
-        self.server_list = []    # created by Creation Write
-        self.client_list = []    # modified by master
+        self.server_list = set() # created by Creation Write
+        self.client_list = set() # modified by master
         self.nt = Network(self.uid)
         try:
             self.t_recv = Thread(target=self.receive)
@@ -82,7 +82,7 @@ class Server:
                             print(self.uid, "error: unable to start new thread")
                     else:
                         self.tentative_log.append(buf.content)
-                        self.server_list.append(buf.content.sender_id)
+                        self.server_list.add(buf.content.sender_id)
                         self.history.append((self.playlist, self.server_list,
                                              self.client_list))
                         m_create_ack = Message(self.node_id, self.unique_id,
@@ -92,7 +92,7 @@ class Server:
                 elif buf.mtype == "Creation_Ack":
                     # buf.content contains sender's accept_time
                     if TERM_LOG:
-                            print(self.uid, "tries to acquire a c_antientropy lock in receive.Creation_Ack")
+                        print(self.uid, "tries to acquire a c_antientropy lock in receive.Creation_Ack")
                     self.c_create.acquire()
                     if TERM_LOG:
                         print(self.uid, "acquires a c_create lock in receive.Creation_Ack")
@@ -116,8 +116,14 @@ class Server:
                     self.c_antientropy.release()
 
                 elif buf.mtype == "RequestAntiEn":
+                    if not buf.sender_id in self.server_list: # unknown server
+                        m_reject_anti = Message(self.node_id, self.unique_id,
+                                                "AntiEn_Reject", None)
+                        self.nt.send_to_node(buf.sender_id, m_reject_anti)
+                        continue
+
                     if TERM_LOG:
-                            print(self.uid, "tries to acquire a c_antientropy lock in receive.RequestAntiEn")
+                        print(self.uid, "tries to acquire a c_antientropy lock in receive.RequestAntiEn")
                     self.c_antientropy.acquire()
                     if TERM_LOG:
                         print(self.uid, "acquires a c_antientropy lock in receive.RequestAntiEn")
@@ -130,16 +136,25 @@ class Server:
                     if not \
                        self.nt.send_to_node(buf.sender_id, m_anti_entropy_ack):
                        self.c_antientropy.release()
+                       if TERM_LOG:
+                           print(self.uid, "releases a c_antientropy lock in receive.RequestAntiEn.Retire")
+
+                elif buf.mtype == "AntiEn_Reject":
+                    self.c_antientropy.release()
+                    if TERM_LOG:
+                        print(self.uid, "releases a c_antientropy lock in receive.AntiEn_Reject")
 
                 elif buf.mtype == "AntiEn_Ack":
                     if TERM_LOG:
-                            print(self.uid, "tries to acquire a c_antientropy lock in receive.AntiEn_Ack")
+                        print(self.uid, "tries to acquire a c_antientropy lock in receive.AntiEn_Ack")
                     self.c_request_antientropy.acquire()
                     if TERM_LOG:
                         print(self.uid, "acquires a c_antientropy lock in receive.AntiEn_Ack")
                     self.m_anti_entropy = buf.content
                     self.c_request_antientropy.notify()
                     self.c_request_antientropy.release()
+                    if TERM_LOG:
+                        print(self.uid, "releases a c_antientropy lock in receive.AntiEn_Ack")
 
                 elif buf.mtype == "AntiEn_Finsh":
                     self.c_antientropy.release()
@@ -153,9 +168,9 @@ class Server:
 
                 elif buf.mtype == "Restore":
                     if buf.content[0] == "Server":
-                        self.server_list.append(buf.content[1])
+                        self.server_list.add(buf.content[1])
                     else:
-                        self.client_list.append(buf.content[2])
+                        self.client_list.add(buf.content[2])
 
                 elif buf.mtype == "Pause":
                     self.is_paused = True
@@ -177,7 +192,6 @@ class Server:
                     self.nt.send_to_node(buf.sender_id, m_get)
 
                 elif buf.mtype == "Write":
-                    print(self.server_list)
                     if buf.sender_id in self.server_list:
                         if TERM_LOG:
                             print(self.uid, " receives a write from Server#",
@@ -185,10 +199,10 @@ class Server:
                         self.receive_server_writes(buf.content)
                     else:
                         if TERM_LOG:
-                                print(self.uid, "tries to acquire a c_antientropy lock in receive.Write.Client")
+                            print(self.uid, "tries to acquire a c_antientropy lock in receive.Write.Client")
                         self.c_antientropy.acquire()
                         if TERM_LOG:
-                                print(self.uid, "acquires a c_antientropy lock in receive.Write.Client")
+                            print(self.uid, "acquires a c_antientropy lock in receive.Write.Client")
                         if TERM_LOG:
                             print(self.uid, " receives a write from Client#",
                                   buf.sender_id, sep="")
@@ -213,6 +227,7 @@ class Server:
             if self.accept_time != 1:
                 break
             self.c_create.wait()
+        self.server_list.add(dest_id)
         self.c_create.release()
         if TERM_LOG:
             print(self.uid, "releases a c_create lock in notify")
@@ -229,13 +244,13 @@ class Server:
         if TERM_LOG:
             print(self.uid, "acquires a c_antientropy lock in timer_anti_entropy")
 
-        rand_index = random.randint(0, len(self.server_list)-1)
-        while self.server_list[rand_index] == self.node_id:
-            rand_index = random.randint(0, len(self.server_list)-1)
-        self.anti_entropy(self.server_list[rand_index])
+        rand_dest = random.sample(self.server_list, 1)[0]
+        while rand_dest == self.node_id:
+            rand_dest = random.sample(self.server_list, 1)[0]
+        self.anti_entropy(rand_dest)
 
         m_finish = Message(self.node_id, self.unique_id, "AntiEn_Finsh", None)
-        self.nt.send_to_node(self.server_list[rand_index], m_finish)
+        self.nt.send_to_node(rand_dest, m_finish)
 
         if self.is_retired:
             m_retire = Message(self.node_id, None, "Retire", None)
@@ -250,6 +265,8 @@ class Server:
     '''
     Primary commits periodically. '''
     def timer_primary_commit(self):
+        if TERM_LOG:
+            print(self.uid, "tries to acquire a c_antientropy lock in timer_primary_commit")
         self.c_antientropy.acquire()
         if TERM_LOG:
             print(self.uid, "acquires a c_antientropy lock in timer_primary_commit")
@@ -339,6 +356,7 @@ class Server:
                 if self.committed_log[i].wid > w.wid:
                     insert_point = i
                     break
+
             # rollback
             suffix_committed_log = self.committed_log[insert_point:]
             if insert_point == 0:
@@ -349,15 +367,21 @@ class Server:
                 self.playlist = self.history[insert_point-1]
                 self.history  = self.history[:insert_point-1]
                 self.committed_log = self.committed_log[:insert_point-1]
+
             # insert w
             self.bayou_write(w)
+
             # roll forward
             for wx in suffix_committed_log:
                 self.bayou_write(wx)
+
             # tentative roll forward
             self.tentative_log.remove(w)
-            for wx in self.tentative_log:
+            tmp_tentative_log = copy.deepcopy(self.tentative_log)
+            self.tentative_log = []
+            for wx in tmp_tentative_log:
                 self.bayou_write(wx)
+            print(self.uid, "commit", self.committed_log, "tentative", self.tentative_log)
 
         else:
             insert_point = len(self.tentative_log)
@@ -396,7 +420,7 @@ class Server:
         elif w.mtype == "Delete":
             self.playlist.pop(cmd)
         elif w.mtype == "Creation":
-            self.server_list.append(w.content)
+            self.server_list.add(w.sender_id)
         elif w.mtype == "Retirement":
             self.server_list.remove(w.sender_id)
             self.version_vector.pop(w.content)
