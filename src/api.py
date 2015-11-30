@@ -27,7 +27,7 @@ try:
     self.t_recv.daemon = True
     self.t_recv.start()
 except:
-    print(self.uid, "error: unable to start new thread")
+    print(uid, "error: unable to start new thread")
 
 def receive(self):
     while 1:
@@ -64,7 +64,7 @@ def joinServer(server_id):
         # connect to a server in the system
         for index in servers:
             if index != server_id:
-                m_create = Message(-1, None, "Creation", None)
+                m_create = Message(-1, None, "Creation", index)
                 nt.send_to_node(server_id, m_create)
                 break
 
@@ -74,7 +74,7 @@ def retireServer(server_id):
         m_retire = Message(-1, None, "Retire", None)
         nt.send_to_server(server_id, m_retire)
         c_has_retired.acquire()
-        while !has_retired_res:
+        while not has_retired_res:
             pass
         nodes.remove(server_id)
         servers.pop(server_id)
@@ -145,7 +145,7 @@ def printLog(server_id):
         m_print = Message(-1, None, "Print", None)
         has_received_log = False
         nt.send_to_node(server_id, m_print)
-        while !has_received_log:
+        while not has_received_log:
             pass
 
 
@@ -154,7 +154,7 @@ def put(client_id, song_name, url):
         m_put = Message(-1, None, "Put", song_name + ' ' + url)
         has_received_res = False
         nt.send_to_node(client_id, m_put)
-        while !has_received_res:
+        while not has_received_res:
             pass
 
 
@@ -163,7 +163,7 @@ def get(client_id, song_name):
         m_get = Message(-1, None, "Get", song_name)
         has_received_res = False
         nt.send_to_node(client_id, m_get)
-        while !has_received_res:
+        while not has_received_res:
             pass
 
 
@@ -172,7 +172,7 @@ def delete(client_id, song_name):
         m_delete = Message(-1, None, "Delete", song_name)
         has_received_res = False
         nt.send_to_node(client_id, m_delete)
-        while !has_received_res:
+        while not has_received_res:
             pass
 
 

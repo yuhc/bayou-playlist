@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 
-import sys, string, random
+import sys, string, random, threading
 
 from network   import Network
-from threading import Thread, Lock, Conditon
+from threading import Thread, Lock, Condition
+from message   import AntiEntropy, Write, Message
 
 TERM_LOG = True
 
@@ -30,7 +31,7 @@ class Server:
         self.playlist = {}      # song_name: url
         self.history  = []      # list of history playlists
 
-        self.CSN = 0            # commit sequence number
+        self.CSN = -1           # commit sequence number
         self.accept_time = 1
 
         self.committed_log = []
@@ -69,28 +70,36 @@ class Server:
                     self.version_vector[self.unique_id] = self.accept_time
 
                 if buf.mtype == "Creation":
-                    tentative_log.append(buf.content)
-                    server_list.append(buf.content.sender_id)
-                    history.append((playlist, server_list, client_list))
-                    m_create_ack = Message(self.node_id, self.unique_id,
-                                           "Creation_Ack", self.accept_time)
-                    self.nt.send_to_node(buf.sender_id, m_create_ack)
+                    if buf.sender_id < 0:
+                        self.notify(buf.content)
+                    else:
+                        self.tentative_log.append(buf.content)
+                        self.server_list.append(buf.content.sender_id)
+                        self.history.append((self.playlist, self.server_list,
+                                             self.client_list))
+                        m_create_ack = Message(self.node_id, self.unique_id,
+                                               "Creation_Ack", self.accept_time)
+                        self.nt.send_to_node(buf.sender_id, m_create_ack)
 
                 elif buf.mtype == "Creation_Ack":
                     # buf.content contains sender's accept_time
-                    c_create.acquire()
+                    self.c_create.acquire()
+                    if TERM_LOG:
+                        print(self.uid, "acquires a c_create lock in receive.Creation_Ack")
                     self.unique_id   = (buf.content, buf.unique_id)
                     self.accept_time = buf.content + 1
                     self.version_vector[self.unique_id] = self.accept_time
-                    c_create.notify()
-                    c_create.release()
+                    self.c_create.notify()
+                    self.c_create.release()
+                    if TERM_LOG:
+                        print(self.uid, "releases a c_create lock in receive.Creation_Ack")
 
                 elif buf.mtype == "Retire":
                     self.is_retired = True
                     self.accept_time = self.accept_time + 1
                     self.version_vector[self.unique_id] = self.accept_time
                     w_retire = Write(self.sender_id, self.unique_id,
-                                     "Retirement", None
+                                     "Retirement", None,
                                      self.accept_time, self.unique_id)
                     self.c_antientropy.acquire()
                     self.receive_server_writes(w_retire)
@@ -98,24 +107,30 @@ class Server:
 
                 elif buf.mtype == "RequestAntiEn":
                     self.c_antientropy.acquire()
+                    if TERM_LOG:
+                        print(self.uid, "acquires a c_antientropy lock in receive.RequestAntiEn")
                     a_ack = AntiEntropy(self.node_id, self.version_vector,
                                         self.CSN, self.committed_log,
                                         self.tentative_log)
                     m_anti_entropy_ack = Message(self.node_id, self.unique_id,
                                                  "AntiEn_Ack", a_ack)
                     # dest_id may retire
-                    if not
+                    if not \
                        self.nt.send_to_node(buf.sender_id, m_anti_entropy_ack):
                        self.c_antientropy.release()
 
                 elif buf.mtype == "AntiEn_Ack":
                     self.c_request_antientropy.acquire()
+                    if TERM_LOG:
+                        print(self.uid, "acquires a c_antientropy lock in receive.AntiEn_Ack")
                     self.m_anti_entropy = buf.content
                     self.c_request_antientropy.notify()
                     self.c_request_antientropy.release()
 
                 elif buf.mtype == "AntiEn_Finsh":
                     self.c_antientropy.release()
+                    if TERM_LOG:
+                        print(self.uid, "releases a c_antientropy lock in receive.AntiEn_Finsh")
 
                 # from master
                 elif buf.mtype == "Break":
@@ -148,12 +163,22 @@ class Server:
                     self.nt.send_to_node(buf.sender_id, m_get)
 
                 elif buf.mtype == "Write":
-                    c_antientropy.acquire()
+                    self.c_antientropy.acquire()
+                    if TERM_LOG:
+                        print(self.uid, "acquires a c_antientropy lock in receive.Write")
                     if buf.sender_id in server_list:
+                        if TERM_LOG:
+                            print(self.uid, " receives a write from Server#",
+                                  buf.sender_id, sep="")
                         self.receive_server_writes(buf.content)
                     else:
+                        if TERM_LOG:
+                            print(self.uid, " receives a write from Client#",
+                                  buf.sender_id, sep="")
                         self.receive_client_writes(buf.content)
-                    c_antientropy.release()
+                    self.c_antientropy.release()
+                    if TERM_LOG:
+                        print(self.uid, "releases a c_antientropy lock in receive.Write")
                     done = Message(self.node_id, None, "Done", None)
                     self.nt.send_to_master(done)
 
@@ -173,7 +198,15 @@ class Server:
     '''
     Process Anti-Entropy periodically. '''
     def timer_anti_entropy(self):
-        c_antientropy.acquire()
+        if not self.server_list:
+            threading.Timer(self.ANTI_ENTROPY_TIME,
+                            self.timer_anti_entropy).start()
+            return
+
+        self.c_antientropy.acquire()
+        if TERM_LOG:
+            print(self.uid, "acquires a c_antientropy lock in timer_anti_entropy")
+
         rand_index = random.randint(0, len(self.server_list)-1)
         while self.server_list[rand_index] == self.node_id:
             rand_index = random.randint(0, len(self.server_list)-1)
@@ -187,17 +220,26 @@ class Server:
             self.nt.send_to_master(m_retire)
 
         threading.Timer(self.ANTI_ENTROPY_TIME, self.timer_anti_entropy).start()
-        c_antientropy.release()
+
+        self.c_antientropy.release()
+        if TERM_LOG:
+            print(self.uid, "releases a c_antientropy lock in timer_anti_entropy")
 
     '''
     Primary commits periodically. '''
     def timer_primary_commit(self):
-        c_antientropy.acquire()
+        self.c_antientropy.acquire()
+        if TERM_LOG:
+            print(self.uid, "acquires a c_antientropy lock in timer_primary_commit")
+
         for wx in self.tentative_log:
             wx.state = "COMMITTED"
+            wx.CSN   = self.CSN + 1
             self.receive_server_writes(wx)
         self.tentative_log = []
-        c_antientropy.release()
+        self.c_antientropy.release()
+        if TERM_LOG:
+            print(self.uid, "releases a c_antientropy lock in timer_primary_commit")
 
         threading.Timer(self.PRIMARY_COMMIT_TIME,
                         self.timer_primary_commit).start()
@@ -205,10 +247,10 @@ class Server:
     '''
     Process a received message of type of AntiEntropy. Stated in the paper
     Flexible Update Propagation '''
-    def anti_entropy(receiver_id):
+    def anti_entropy(self, receiver_id):
         m_request_anti = Message(self.node_id, self.unique_id, "RequestAntiEn",
                                  None)
-        self.block_request_anti = True
+        self.m_anti_entropy = None
         self.nt.send_to_node(receiver_id, m_request_anti)
         self.c_request_antientropy.acquire()
         while True:
@@ -233,14 +275,13 @@ class Server:
             try:
                 self.version_vector[v] = max(self.version_vector[v],
                                              R_version_vector[v])
+            except:
+                pass
 
         # anti-entropy with support for committed writes
         if R_CSN < S_CSN:
             # committed log
-            for index in [R_CSN+1:len(S_committed_log)]:
-            # for w in S_committed_log:
-                # if w in R_committed_log or w in R_tentative_log:
-                #    continue
+            for index in range(R_CSN+1, len(S_committed_log)):
                 w = S_committed_log[index]
                 if w.accept_time <= R_version_vector[w.sender_id]:
                     m_commit = Message(self.node_id, self.unique_id,
@@ -335,6 +376,7 @@ class Server:
             self.version_vector.pop(w.content)
         if w.state == "COMMITTED":
             self.committed_log.append(w)
+            self.CSN = w.CSN
         else:
             self.tentative_log.append(w)
         self.history.append(playlist)
@@ -347,12 +389,12 @@ class Server:
             if wx.mtype == "Put":
                 plog = plog + "PUT:(" + wx.content + "):TRUE\n"
             elif wx.mtype == "Delete":
-                plog = plog + "DELETE:(" + wx.content _ "):TRUE\n"
+                plog = plog + "DELETE:(" + wx.content + "):TRUE\n"
         for wx in self.tentative_log:
             if wx.mtype == "Put":
                 plog = plog + "PUT:(" + wx.content + "):FALSE\n"
             elif wx.mtype == "Delete":
-                plog = plog + "DELETE:(" + wx.content _ "):FALSE\n"
+                plog = plog + "DELETE:(" + wx.content + "):FALSE\n"
 
         m_log = Message(self.node_id, None, "Playlist", plog)
         self.nt.send_to_master(m_log)

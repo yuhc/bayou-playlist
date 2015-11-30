@@ -1,12 +1,13 @@
 #!/usr/bin/python3
 
-import string, sys
+import string, sys, threading
 
 from network   import Network
 from threading import Thread, Lock, Condition
+from message   import AntiEntropy, Write, Message
 
 TERM_LOG = True
-c_send_to_server = Condition()
+c_can_send_to_server = Condition()
 
 class Client:
 
@@ -17,8 +18,8 @@ class Client:
         self.read_set = -1 # session guarantees
 
         # create the network controller
-        self.connected_server # which server is connected
-        self.nt = Network(self.uid)
+        self.connected_server   = None # which server is connected
+        self.nt                 = Network(self.uid)
         self.can_send_to_server = True
         try:
             self.t_recv = Thread(target=self.receive)
@@ -36,16 +37,16 @@ class Client:
                 # TODO: parse buf
 
                 if buf.mtype == "Put":
-                    w = Write(self.node_id, None, "Put", None, None,
+                    w = Write(self.node_id, None, "Put", None, 0,
                               buf.content)
-                    m_put = Message(self.node_id, None, "WritePut", w)
+                    m_put = Message(self.node_id, None, "Write", w)
                     c_can_send_to_server.acquire()
                     while True:
                         if self.can_send_to_server:
                             break
                         c_can_send_to_server.wait()
-                    c_can_send_to_server.release()
                     self.nt.send_to_node(self.connected_server, m_put)
+                    c_can_send_to_server.release()
 
                 elif buf.mtype == "Get":
                     m_get = Message(self.node_id, None, "Get", buf.content)
@@ -54,20 +55,20 @@ class Client:
                         if self.can_send_to_server:
                             break
                         c_can_send_to_server.wait()
-                    c_can_send_to_server.release()
                     self.nt.send_to_node(self.connected_server, m_get)
+                    c_can_send_to_server.release()
 
                 elif buf.mtype == "Delete":
-                    w = Write(self.node_id, None, "Delete", None, None,
+                    w = Write(self.node_id, None, "Delete", None, 0,
                               buf.content)
-                    m_delete = Message(self.node_id, None, "WriteDelete", w)
+                    m_delete = Message(self.node_id, None, "Write", w)
                     c_can_send_to_server.acquire()
                     while True:
                         if self.can_send_to_server:
                             break
                         c_can_send_to_server.wait()
-                    c_can_send_to_server.release()
                     self.nt.send_to_node(self.connected_server, m_delete)
+                    c_can_send_to_server.release()
 
                 elif buf.mtype == "GetAck":
                     (song_name, song_url, server_CSN) = buf.content
@@ -80,6 +81,9 @@ class Client:
                     m_get_msg = Message(self.node_id, None, "MGetAck", get_content)
                     self.nt.send_to_master(m_get_msg)
 
+                elif buf.mtype == "Join":
+                    self.connected_server   = buf.content
+
                 elif buf.mtype == "Break":
                     c_can_send_to_server.acquire()
                     self.can_send_to_server = False
@@ -88,6 +92,7 @@ class Client:
                 elif buf.mtype == "Restore":
                     c_can_send_to_server.acquire()
                     self.can_send_to_server = True
+                    self.connected_server   = buf.content[1]
                     c_can_send_to_server.notify()
                     c_can_send_to_server.release()
 

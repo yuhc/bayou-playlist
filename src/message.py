@@ -80,9 +80,9 @@ class Write:
     Message format:
         (Write, sender_id, message_type, CSN, accept_time, message_content) '''
     def __str__(self):
-        return str(("Write", self.sender_id, self.mtype, self.CSN,
+        return str(("Write", self.sender_id, self.sender_uid, self.mtype, self.CSN,
                     self.accept_time, self.content))
 
     def __repr__(self):
-        return str(("Write", self.sender_id, self.mtype, self.CSN,
+        return str(("Write", self.sender_id, self.sender_uid, self.mtype, self.CSN,
                     self.accept_time, self.content))
