@@ -12,6 +12,7 @@ class Message:
                         AntiEn_Finsh, Creation, Creation_Ack
            from master: Retire, Join, Break, Restore, Pause, Start, Print, Get,
                         Write
+           to master: MGetAck, Playlist
     '''
     def __init__(self, sender, sender_uid, mtype, content):
         self.sender_id  = sender

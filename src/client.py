@@ -37,7 +37,7 @@ class Client:
 
                 if buf.mtype == "Put":
                     w = Write(self.node_id, "Put", None, None, buf.content)
-                    m_put = Message(self.node_id, None, "Write", w)
+                    m_put = Message(self.node_id, None, "WritePut", w)
                     c_can_send_to_server.acquire()
                     while True:
                         if self.can_send_to_server:
@@ -54,11 +54,11 @@ class Client:
                             break
                         c_can_send_to_server.wait()
                     c_can_send_to_server.release()
-                    self.nt.send_to_node(self.connected_server, m_put)
+                    self.nt.send_to_node(self.connected_server, m_get)
 
                 elif buf.mtype == "Delete":
                     w = Write(self.node_id, "Delete", None, None, buf.content)
-                    m_delete = Message(self.node_id, None, "Write", w)
+                    m_delete = Message(self.node_id, None, "WriteDelete", w)
                     c_can_send_to_server.acquire()
                     while True:
                         if self.can_send_to_server:
@@ -69,11 +69,14 @@ class Client:
 
                 elif buf.mtype == "GetAck":
                     (song_name, song_url, server_CSN) = buf.content
+                    get_content = ""
                     if (self.readset > server_CSN):
-                        print song_name+":ERR_DEP"
+                        get_content = song_name+":ERR_DEP"
                     else:
                         self.read_set = server_CSN
-                        print song_name+":"+song_url
+                        get_content = song_name+":"+song_url
+                    m_get_msg = Message(self.node_id, None, "MGetAck", get_content)
+                    self.nt.send_to_master(m_get_msg)
 
                 elif buf.mtype == "Break":
                     c_can_send_to_server.acquire()

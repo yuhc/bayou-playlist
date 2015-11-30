@@ -139,6 +139,8 @@ class Server:
                     else:
                         self.receive_client_writes(buf.content)
                     c_antientropy.release()
+                    done = Message(self.node_id, None, "Done", None)
+                    self.nt.send_to_master(done)
 
     '''
     Notify server @dest_id about its joining. '''

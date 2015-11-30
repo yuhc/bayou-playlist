@@ -38,9 +38,12 @@ def receive(self):
             if buf.mtype == "Playlist":
                 print(buf.content)
                 has_received_log = True
-            if buf.mtype == "Result":
-                print(buf.result)
+            elif buf.mtype == "MGetAck":
+                print(buf.content)
                 has_received_res = True
+            elif buf.mtype == "Done":
+                has_received_res = True
+            
 
 
 def joinServer(server_id):
