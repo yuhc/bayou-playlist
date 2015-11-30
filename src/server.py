@@ -258,7 +258,6 @@ class Server:
     '''
     Receive_Writes in paper Bayou, client part. '''
     def receive_client_writes(w):
-        #self.accept_time = max(self.accept_time+1, w.accept_time) # BUG?
         w.sender         = self.node_id
         w.accept_time    = self.accept_time
         w.wid            = (self.accept_time, self.unique_id)

@@ -2,7 +2,7 @@
 
 import subprocess, sys, os, signal, time
 
-from threading import Thread, Lock
+from threading import Thread, Lock, Condition
 from server    import Server
 from client    import Client
 from message   import Message
@@ -18,6 +18,7 @@ clients = {} # list of clients
 
 has_received_log = False
 has_received_res = False
+has_retired_res = False
 
 uid = "Master#0"
 nt  = Network(uid)
@@ -41,9 +42,10 @@ def receive(self):
             elif buf.mtype == "MGetAck":
                 print(buf.content)
                 has_received_res = True
-            elif buf.mtype == "Done":
+            elif buf.mtype == "Done": # done processing put/delete
                 has_received_res = True
-            
+            elif buf.mtype == "RetireAck":
+                has_retired_res = True
 
 
 def joinServer(server_id):
@@ -71,7 +73,9 @@ def retireServer(server_id):
     if servers[server_id]:
         m_retire = Message(-1, None, "Retire", None)
         nt.send_to_server(server_id, m_retire)
-        # TODO: block until it is able to tell another server of its retirement
+        c_has_retired.acquire()
+        while !has_retired_res:
+            pass
         nodes.remove(server_id)
         servers.pop(server_id)
 
