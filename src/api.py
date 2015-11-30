@@ -76,7 +76,6 @@ def retireServer(server_id):
         c_has_retired.acquire()
         while !has_retired_res:
             pass
-        # TODO: block until it is able to tell another server of its retirement
         nodes.remove(server_id)
         servers.pop(server_id)
 
