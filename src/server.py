@@ -230,7 +230,9 @@ class Server:
 
         # update version_vector
         for v in S_version_vector:
-            # TODO
+            try:
+                self.version_vector[v] = max(self.version_vector[v],
+                                             R_version_vector[v])
 
         # anti-entropy with support for committed writes
         if R_CSN < S_CSN:
@@ -268,6 +270,8 @@ class Server:
         if w.state == "COMMITTED":
             insert_point = len(self.committed_log)
             for i in range(len(self.committed_log)):
+                if committed_log[i].wid == w.wid:
+                    return
                 if committed_log[i].wid > w.wid:
                     insert_point = i
                     break
@@ -294,6 +298,8 @@ class Server:
         else:
             insert_point = len(self.tentative_log)
             for i in range(len(self.tentative_log)):
+                if tentative_log[i].wid == w.wid:
+                    return
                 if tentative_log[i].wid > w.wid:
                     insert_point = i
                     break
