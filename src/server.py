@@ -67,6 +67,7 @@ class Server:
                 if isinstance(buf.content, Write):
                     self.accept_time = max(self.accept_time,
                                            buf.content.accept_time) + 1
+                    self.version_vector[self.unique_id] = self.accept_time
 
                 if buf.mtype == "Creation":
                     tentative_log.append(buf.content)
@@ -236,6 +237,7 @@ class Server:
     Receive_Writes in paper Bayou, client part. '''
     def receive_client_writes(w):
         self.accept_time = max(self.accept_time+1, w.accept_time) # BUG?
+        self.version_vector[self.unique_id] = self.accept_time
         w.sender         = self.node_id
         w.accept_time    = self.accept_time
         w.wid            = (self.accept_time, self.node_id)
