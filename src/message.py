@@ -57,12 +57,13 @@ class Write:
     '''
     A Write is created when a server receives any message from a client.
     @mtype is either Creation, Retirement, Put or Delete. '''
-    def __init__(self, sender, mtype, CSN, accept_time, content):
+    def __init__(self, sender, sender_uid, mtype, CSN, accept_time, content):
         self.sender_id   = sender
+        self.sender_uid  = sender_uid  # unique_id
         self.mtype       = mtype
         self.CSN         = CSN
         self.accept_time = accept_time
-        self.wid         = (accept_time, sender)
+        self.wid         = (accept_time, sender_uid)
         self.state       = "TENTATIVE" # or "COMMITTED"
         self.content     = content     # content is a string
 

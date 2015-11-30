@@ -25,8 +25,7 @@ class Server:
         self.is_paused  = False
 
         self.version_vector = {} # unique_id: accept_time
-        if is_primary:
-            self.version_vector[self.unique_id] = 1
+        self.version_vector[self.unique_id] = 1
 
         self.playlist = {}      # song_name: url
         self.history  = []      # list of history playlists
@@ -67,6 +66,7 @@ class Server:
                 if isinstance(buf.content, Write):
                     self.accept_time = max(self.accept_time,
                                            buf.content.accept_time) + 1
+                    self.version_vector[self.unique_id] = self.accept_time
 
                 if buf.mtype == "Creation":
                     tentative_log.append(buf.content)
@@ -81,8 +81,20 @@ class Server:
                     c_create.acquire()
                     self.unique_id   = (buf.content, buf.unique_id)
                     self.accept_time = buf.content + 1
+                    self.version_vector[self.unique_id] = self.accept_time
                     c_create.notify()
                     c_create.release()
+
+                elif buf.mtype == "Retire":
+                    self.is_retired = True
+                    self.accept_time = self.accept_time + 1
+                    self.version_vector[self.unique_id] = self.accept_time
+                    w_retire = Write(self.sender_id, self.unique_id,
+                                     "Retirement", None
+                                     self.accept_time, self.unique_id)
+                    self.c_antientropy.acquire()
+                    self.receive_server_writes(w_retire)
+                    self.c_antientropy.release()
 
                 elif buf.mtype == "RequestAntiEn":
                     self.c_antientropy.acquire()
@@ -91,7 +103,10 @@ class Server:
                                         self.tentative_log)
                     m_anti_entropy_ack = Message(self.node_id, self.unique_id,
                                                  "AntiEn_Ack", a_ack)
-                    self.nt.send_to_node(buf.sender_id, m_anti_entropy_ack)
+                    # dest_id may retire
+                    if not
+                       self.nt.send_to_node(buf.sender_id, m_anti_entropy_ack):
+                       self.c_antientropy.release()
 
                 elif buf.mtype == "AntiEn_Ack":
                     self.c_request_antientropy.acquire()
@@ -145,7 +160,7 @@ class Server:
     '''
     Notify server @dest_id about its joining. '''
     def notify(self, dest_id):
-        w_write = Write(self.node_id, "Creation", 0, 1, None)
+        w_write = Write(self.node_id, self.unique_id, "Creation", 0, 1, None)
         m_join_server = Message(self.node_id, None, "Creation", w_write)
         self.nt.send_to_node(dest_id, m_join_server)
         self.c_create.acquire()
@@ -166,6 +181,10 @@ class Server:
 
         m_finish = Message(self.node_id, self.unique_id, "AntiEn_Finsh", None)
         self.nt.send_to_node(self.server_list[rand_index], m_finish)
+
+        if self.is_retired:
+            m_retire = Message(self.node_id, None, "Retire", None)
+            self.nt.send_to_master(m_retire)
 
         threading.Timer(self.ANTI_ENTROPY_TIME, self.timer_anti_entropy).start()
         c_antientropy.release()
@@ -209,6 +228,10 @@ class Server:
         S_version_vector = self.version_vector
         S_CSN            = self.CSN
 
+        # update version_vector
+        for v in S_version_vector:
+            # TODO
+
         # anti-entropy with support for committed writes
         if R_CSN < S_CSN:
             # committed log
@@ -235,10 +258,10 @@ class Server:
     '''
     Receive_Writes in paper Bayou, client part. '''
     def receive_client_writes(w):
-        self.accept_time = max(self.accept_time+1, w.accept_time) # BUG?
+        #self.accept_time = max(self.accept_time+1, w.accept_time) # BUG?
         w.sender         = self.node_id
         w.accept_time    = self.accept_time
-        w.wid            = (self.accept_time, self.node_id)
+        w.wid            = (self.accept_time, self.unique_id)
         self.tentative_log.append(w)
         self.bayou_write(w)
 
@@ -303,6 +326,8 @@ class Server:
             self.playlist[cmd[0]] = cmd[1]
         elif w.mtype == "Delete":
             self.playlist.pop(cmd)
+        elif w.mtype == "Retirement":
+            self.version_vector.pop(w.content)
         if w.state == "COMMITTED":
             self.committed_log.append(w)
         else:

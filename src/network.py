@@ -47,9 +47,11 @@ class Network:
             if TERM_LOG:
                 print(self.uid, " sends ", str(message), " to Node ", dest_id,
                       sep="")
+            return True
         except:
             if DEBUG_SOCKET and TERM_LOG:
                 print(self.uid, "connects to Node", dest_id, "failed")
+        return False
 
     def send_to_master(self, message):
         try:
@@ -59,9 +61,11 @@ class Network:
             if TERM_LOG:
                 print(self.uid, " sends ", str(message), " to Master ",
                       sep="")
+            return True
         except:
             if DEBUG_SOCKET and TERM_LOG:
                 print(self.uid, "connects to Master", dest_id, "failed")
+        return False
 
     def receive(self):
         connection, address = self.server.accept()

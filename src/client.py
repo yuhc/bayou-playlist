@@ -36,7 +36,8 @@ class Client:
                 # TODO: parse buf
 
                 if buf.mtype == "Put":
-                    w = Write(self.node_id, "Put", None, None, buf.content)
+                    w = Write(self.node_id, None, "Put", None, None,
+                              buf.content)
                     m_put = Message(self.node_id, None, "WritePut", w)
                     c_can_send_to_server.acquire()
                     while True:
@@ -57,7 +58,8 @@ class Client:
                     self.nt.send_to_node(self.connected_server, m_get)
 
                 elif buf.mtype == "Delete":
-                    w = Write(self.node_id, "Delete", None, None, buf.content)
+                    w = Write(self.node_id, None, "Delete", None, None,
+                              buf.content)
                     m_delete = Message(self.node_id, None, "WriteDelete", w)
                     c_can_send_to_server.acquire()
                     while True:
