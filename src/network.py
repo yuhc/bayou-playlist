@@ -64,7 +64,7 @@ class Network:
             return True
         except:
             if DEBUG_SOCKET and TERM_LOG:
-                print(self.uid, "connects to Master", dest_id, "failed")
+                print(self.uid, "connects to Master failed")
         return False
 
     def receive(self):

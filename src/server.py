@@ -71,7 +71,12 @@ class Server:
 
                 if buf.mtype == "Creation":
                     if buf.sender_id < 0:
-                        self.notify(buf.content)
+                        try:
+                            Thread(target=self.notify,args=(buf.content,)).start()
+                            print("successful")
+                        except:
+                            print(self.uid, "error: unable to start new thread")
+                        print("finish creation of thread")
                     else:
                         self.tentative_log.append(buf.content)
                         self.server_list.append(buf.content.sender_id)
@@ -86,7 +91,7 @@ class Server:
                     self.c_create.acquire()
                     if TERM_LOG:
                         print(self.uid, "acquires a c_create lock in receive.Creation_Ack")
-                    self.unique_id   = (buf.content, buf.unique_id)
+                    self.unique_id   = (buf.content, buf.sender_uid)
                     self.accept_time = buf.content + 1
                     self.version_vector[self.unique_id] = self.accept_time
                     self.c_create.notify()
@@ -166,7 +171,7 @@ class Server:
                     self.c_antientropy.acquire()
                     if TERM_LOG:
                         print(self.uid, "acquires a c_antientropy lock in receive.Write")
-                    if buf.sender_id in server_list:
+                    if buf.sender_id in self.server_list:
                         if TERM_LOG:
                             print(self.uid, " receives a write from Server#",
                                   buf.sender_id, sep="")
@@ -188,12 +193,17 @@ class Server:
         w_write = Write(self.node_id, self.unique_id, "Creation", 0, 1, None)
         m_join_server = Message(self.node_id, None, "Creation", w_write)
         self.nt.send_to_node(dest_id, m_join_server)
+
         self.c_create.acquire()
+        if TERM_LOG:
+            print(self.uid, "acquires a c_create lock in notify")
         while True:
             if self.accept_time != 1:
                 break
             self.c_create.wait()
         self.c_create.release()
+        if TERM_LOG:
+            print(self.uid, "releases a c_create lock in notify")
 
     '''
     Process Anti-Entropy periodically. '''
@@ -281,9 +291,9 @@ class Server:
         # anti-entropy with support for committed writes
         if R_CSN < S_CSN:
             # committed log
-            for index in range(R_CSN+1, len(S_committed_log)):
-                w = S_committed_log[index]
-                if w.accept_time <= R_version_vector[w.sender_id]:
+            for index in range(R_CSN+1, len(self.committed_log)):
+                w = self.committed_log[index]
+                if w.accept_time <= R_version_vector[w.sender_uid]:
                     m_commit = Message(self.node_id, self.unique_id,
                                        "Write", w)
                     self.nt.send_to_node(receiver_id, m_commit)
@@ -291,8 +301,8 @@ class Server:
                     m_write = Message(self.node_id, self.unique_id, "Write", w)
                     self.nt.send_to_node(receiver_id, m_write)
         # tentative log
-        for w in S_tentative_log:
-            if R_version_vector[w.sender_id] < w.accept_time:
+        for w in self.tentative_log:
+            if R_version_vector[w.sender_uid] < w.accept_time:
                 m_write = Message(self.node_id, self.unique_id, "Write", w)
                 self.nt.send_to_node(receiver_id, m_write)
 
@@ -300,26 +310,27 @@ class Server:
 
     '''
     Receive_Writes in paper Bayou, client part. '''
-    def receive_client_writes(w):
+    def receive_client_writes(self, w):
         w.sender         = self.node_id
+        w.sender_uid     = self.unique_id
         w.accept_time    = self.accept_time
         w.wid            = (self.accept_time, self.unique_id)
         self.tentative_log.append(w)
         self.bayou_write(w)
 
-    def receive_server_writes(w):
+    def receive_server_writes(self, w):
         if w.state == "COMMITTED":
             insert_point = len(self.committed_log)
             for i in range(len(self.committed_log)):
-                if committed_log[i].wid == w.wid:
+                if self.committed_log[i].wid == w.wid:
                     return
-                if committed_log[i].wid > w.wid:
+                if self.committed_log[i].wid > w.wid:
                     insert_point = i
                     break
             # rollback
             suffix_committed_log = self.committed_log[insert_point:]
             if insert_point == 0:
-                self.playlist = set()
+                self.playlist = {}
                 self.history  = []
                 self.committed_log = []
             else:
@@ -348,7 +359,7 @@ class Server:
             total_point = insert_point + len(self.committed_log)
             suffix_tentative_log = self.tentative_log[insert_point:]
             if total_point == 0:
-                self.playlist = set()
+                self.playlist = {}
                 self.history = []
             else:
                 self.playlist = self.history[total_point-1]
@@ -379,7 +390,7 @@ class Server:
             self.CSN = w.CSN
         else:
             self.tentative_log.append(w)
-        self.history.append(playlist)
+        self.history.append(self.playlist)
 
     '''
     Print playlist and send it to master. '''
