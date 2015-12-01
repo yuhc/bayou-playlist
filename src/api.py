@@ -28,6 +28,12 @@ class API:
 
         self.uid = "Master#0"
         self.nt  = Network(uid)
+        try:
+            t_recv = Thread(target=receive)
+            t_recv.daemon = True
+            t_recv.start()
+        except:
+            print(uid, "error: unable to start new thread")
 
     def receive(self):
         while 1:
@@ -60,14 +66,6 @@ class API:
                     has_retired_res = True
                     c_has_received_res.notify()
                     c_has_received_res.release()
-
-    try:
-        t_recv = Thread(target=receive)
-        t_recv.daemon = True
-        t_recv.start()
-    except:
-        print(uid, "error: unable to start new thread")
-
 
     def joinServer(server_id):
         if not server_id in nodes:
@@ -169,65 +167,65 @@ class API:
                 pass
 
 
-    def put(client_id, song_name, url):
-        if client_id in clients:
+    def put(self, client_id, song_name, url):
+        if client_id in self.clients:
             m_put = Message(-1, None, "Put", song_name + ' ' + url)
-            print("put before", has_received_res)
-            has_received_res = False
-            nt.send_to_node(client_id, m_put)
-            print("after before", has_received_res)
-            # while not has_received_res:
+            print("put before", self.has_received_res)
+            self.has_received_res = False
+            self.nt.send_to_node(client_id, m_put)
+            print("after before", self.has_received_res)
+            # while not self.has_received_res:
             #     pass
-            c_has_received_res.acquire()
+            self.c_has_received_res.acquire()
             print("acquires lock")
             while True:
-                if has_received_res:
+                if self.has_received_res:
                     break
-                c_has_received_res.wait()
-                print("in loop", has_received_res)
+                self.c_has_received_res.wait()
+                print("in loop", self.has_received_res)
             print("XXXXXXXXXXXXXX Done")
-            c_has_received_res.release()
+            self.c_has_received_res.release()
 
 
-    def get(client_id, song_name):
-        if client_id in clients:
+    def get(self, client_id, song_name):
+        if client_id in self.clients:
             m_get = Message(-1, None, "Get", song_name)
-            has_received_res = False
-            nt.send_to_node(client_id, m_get)
-            # while not has_received_res:
+            self.has_received_res = False
+            self.nt.send_to_node(client_id, m_get)
+            # while not self.has_received_res:
             #     pass
-            c_has_received_res.acquire()
+            self.c_has_received_res.acquire()
             while True:
-                if has_received_res:
+                if self.has_received_res:
                     break
-                c_has_received_res.wait()
-            c_has_received_res.release()
+                self.c_has_received_res.wait()
+            self.c_has_received_res.release()
 
-    def delete(client_id, song_name):
-        if client_id in clients:
+    def delete(self, client_id, song_name):
+        if client_id in self.clients:
             m_delete = Message(-1, None, "Delete", song_name)
-            has_received_res = False
-            nt.send_to_node(client_id, m_delete)
-            # while not has_received_res:
+            self.has_received_res = False
+            self.nt.send_to_node(client_id, m_delete)
+            # while not self.has_received_res:
             #     pass
-            c_has_received_res.acquire()
+            self.c_has_received_res.acquire()
             while True:
-                if has_received_res:
+                if self.has_received_res:
                     break
-                c_has_received_res.wait()
-            c_has_received_res.release()
+                self.c_has_received_res.wait()
+            self.c_has_received_res.release()
 
 
-    def exit():
-        # kill the remained nodes and clients
-        for i in servers:
-            if servers[i] != None:
-                os.kill(servers[i], signal.SIGKILL)
+    def exit(self):
+        # kill the remained nodes and self.clients
+        for i in self.servers:
+            if self.servers[i] != None:
+                os.kill(self.servers[i], signal.SIGKILL)
                 if TERM_LOG:
                     print("Server#", i, " stopped", sep="")
-        for i in clients:
-            if clients[i] != None:
-                os.kill(clients[i], signal.SIGKILL)
+        for i in self.clients:
+            if self.clients[i] != None:
+                os.kill(self.clients[i], signal.SIGKILL)
                 if TERM_LOG:
                     print("Client#", i, " stopped", sep="")
         sys.exit()
