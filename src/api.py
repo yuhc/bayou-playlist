@@ -18,9 +18,9 @@ nodes   = [] # list of nodes
 servers = {} # list of servers
 clients = {} # list of clients
 
-has_received_log = False
-has_received_res = False
-has_retired_res = False
+has_received_log   = False
+has_received_res   = False
+has_retired_res    = False
 c_has_received_res = Condition()
 
 uid = "Master#0"
@@ -64,6 +64,7 @@ try:
     t_recv.start()
 except:
     print(uid, "error: unable to start new thread")
+
 
 def joinServer(server_id):
     if not server_id in nodes:
