@@ -83,10 +83,11 @@ class Server:
                         except:
                             print(self.uid, "error: unable to start new thread")
                     else:
-                        self.tentative_log.append(buf.content)
-                        self.server_list.add(buf.content.sender_id)
-                        self.history.append((self.playlist, self.server_list,
-                                             self.client_list))
+                        self.receive_server_writes(buf.content)
+                        # self.tentative_log.append(buf.content)
+                        # self.server_list.add(buf.content.sender_id)
+                        # self.history.append((self.playlist, self.server_list,
+                        #                      self.client_list))
                         m_create_ack = Message(self.node_id, self.unique_id,
                                                "Creation_Ack", self.accept_time)
                         self.nt.send_to_node(buf.sender_id, m_create_ack)
@@ -215,6 +216,7 @@ class Server:
                         if TERM_LOG:
                             print(self.uid, " receives a write from Server#",
                                   buf.sender_id, sep="")
+                        print(self.uid, "receives server write", buf.content.state)
                         self.receive_server_writes(buf.content)
                     else:
                         if TERM_LOG:
@@ -299,9 +301,9 @@ class Server:
             if TERM_LOG:
                 print(self.uid, "acquires a c_antientropy lock in timer_primary_commit")
 
-            for wx in self.tentative_log:
+            tmp_tentative_log = copy.deepcopy(self.tentative_log)
+            for wx in tmp_tentative_log:
                 wx.state = "COMMITTED"
-                wx.CSN   = self.CSN + 1
                 self.receive_server_writes(wx)
             self.tentative_log = []
 
@@ -319,6 +321,8 @@ class Server:
     Process a received message of type of AntiEntropy. Stated in the paper
     Flexible Update Propagation '''
     def anti_entropy(self, receiver_id):
+        if TERM_LOG:
+            print(self.uid, " requests anti-entropy to Server#", receiver_id, sep="")
         m_request_anti = Message(self.node_id, self.unique_id, "RequestAntiEn",
                                  None)
         self.m_anti_entropy = None
@@ -330,7 +334,12 @@ class Server:
                 break
             self.c_request_antientropy.wait()
         if isinstance(self.m_anti_entropy, Message): # was rejected
+            if TERM_LOG:
+                print(self.uid, " was rejected anti-entropy by Server#", receiver_id, sep="")
             return False
+
+        if TERM_LOG:
+            print(self.uid, " starts anti-entropy to Server#", receiver_id, sep="")
 
         m_anti_entropy = self.m_anti_entropy
 
@@ -384,6 +393,7 @@ class Server:
         self.bayou_write(w)
 
     def receive_server_writes(self, w):
+        print(self.uid, "receives", str(w), "from", w.sender_id, w.state)
         # rewrite Creation's wid
         if w.mtype == "Creation":
             w.wid = (w.accept_time, w.sender_uid)
@@ -405,33 +415,45 @@ class Server:
                 self.committed_log = []
             else:
                 self.playlist = self.history[insert_point-1]
-                self.history  = self.history[:insert_point-1]
-                self.committed_log = self.committed_log[:insert_point-1]
+                self.history  = self.history[:insert_point]
+                self.committed_log = self.committed_log[:insert_point]
 
             # insert w
+            w_CSN = w.CSN
             self.bayou_write(w)
+            w.CSN = w_CSN
 
             # roll forward
             for wx in suffix_committed_log:
                 self.bayou_write(wx)
 
             # tentative roll forward
-            self.tentative_log.remove(w)
+            ww = copy.deepcopy(w)
+            ww.state = "TENTATIVE"
+
+            self.tentative_log.remove(ww)
+            try:
+                self.tentative_log.remove(ww)
+            except:
+                pass
             tmp_tentative_log = copy.deepcopy(self.tentative_log)
             self.tentative_log = []
             for wx in tmp_tentative_log:
                 self.bayou_write(wx)
-            print(self.uid, "commit", self.committed_log, "tentative", self.tentative_log)
+            # print(self.uid, "final COMMIT", "commit", self.committed_log, "tentative", self.tentative_log)
 
         else:
+            # print("before insert", self.uid, "commit", self.committed_log, "tentative", self.tentative_log)
             insert_point = len(self.tentative_log)
             for i in range(len(self.tentative_log)):
-                if tentative_log[i].wid == w.wid:
+                if self.tentative_log[i].wid == w.wid:
                     return
-                if tentative_log[i].wid > w.wid:
+                if self.tentative_log[i].wid > w.wid:
                     insert_point = i
                     break
             # rollback
+            # print("insert_point", w, insert_point)
+
             total_point = insert_point + len(self.committed_log)
             suffix_tentative_log = self.tentative_log[insert_point:]
             if total_point == 0:
@@ -439,17 +461,20 @@ class Server:
                 self.history = []
             else:
                 self.playlist = self.history[total_point-1]
-                self.history  = self.history[:total_point-1]
+                self.history  = self.history[:total_point]
             if insert_point == 0:
                 self.tentative_log = []
             else:
-                self.tentative_log = self.tentative_log[:insert_point-1]
+                self.tentative_log = self.tentative_log[:insert_point]
             # insert w
             self.bayou_write(w)
             # roll forward
-            self.tentative_log.remove(w)
-            for wx in self.tentative_log:
+            #self.tentative_log.remove(w)
+            #tmp_tentative_log = copy.deepcopy(self.tentative_log)
+            #self.tentative_log = []
+            for wx in suffix_tentative_log:
                 self.bayou_write(wx)
+            print(self.uid, "Final TENTATIVE", self.committed_log, "tentative", self.tentative_log)
 
     '''
     Bayou_Write in paper Bayou. '''
@@ -465,6 +490,7 @@ class Server:
             self.server_list.remove(w.sender_id)
             self.version_vector.pop(w.content)
         if w.state == "COMMITTED":
+            w.CSN = self.CSN + 1
             self.committed_log.append(w)
             self.CSN = w.CSN
         else:

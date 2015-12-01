@@ -76,6 +76,9 @@ class Write:
     def is_notice(self):
         return self.mtype in ["Creation", "Retirement"]
 
+    def __eq__(self, other):
+        return str(self) == str(other) and self.wid == other.wid and self.state == other.state
+
     '''
     Message format:
         (Write, sender_id, message_type, CSN, accept_time, message_content) '''
