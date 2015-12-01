@@ -54,8 +54,8 @@ class Server:
             w_create = Write(self.node_id, self.unique_id, "Creation", None,
                              self.accept_time, self.unique_id)
             self.bayou_write(w_create)
-            threading.Timer(self.PRIMARY_COMMIT_TIME,
-                            self.timer_primary_commit).start()
+        threading.Timer(self.PRIMARY_COMMIT_TIME,
+                        self.timer_primary_commit).start()
 
         # start Anti-Entropy
         random.seed()
@@ -114,11 +114,6 @@ class Server:
                                      self.accept_time, self.unique_id)
                     self.c_antientropy.acquire()
                     self.receive_server_writes(w_retire)
-
-                    # select a new primary
-                    m_elect = Message(self.sender_id, self.unique_id, "Elect",
-                                      None)
-                    self.nt.send_to_node #TODO
                     self.c_antientropy.release()
 
                 elif buf.mtype == "RequestAntiEn":
@@ -147,9 +142,10 @@ class Server:
                            print(self.uid, "releases a c_antientropy lock in receive.RequestAntiEn.Retire")
 
                 elif buf.mtype == "AntiEn_Reject":
-                    self.c_antientropy.release()
+                    self.m_anti_entropy = Message(None, None, None, "Reject")
+                    self.c_request_antientropy.release()
                     if TERM_LOG:
-                        print(self.uid, "releases a c_antientropy lock in receive.AntiEn_Reject")
+                        print(self.uid, "releases a c_request_antientropy lock in receive.AntiEn_Reject")
 
                 elif buf.mtype == "AntiEn_Ack":
                     if TERM_LOG:
@@ -167,6 +163,9 @@ class Server:
                     self.c_antientropy.release()
                     if TERM_LOG:
                         print(self.uid, "releases a c_antientropy lock in receive.AntiEn_Finsh")
+
+                elif buf.mtype == "Elect":
+                    self.is_primary = True
 
                 # from master
                 elif buf.mtype == "Break":
@@ -220,8 +219,8 @@ class Server:
                         self.c_antientropy.release()
                         if TERM_LOG:
                             print(self.uid, "releases a c_antientropy lock in receive.Write.Client")
-                    done = Message(self.node_id, None, "Done", None)
-                    self.nt.send_to_master(done)
+                        done = Message(self.node_id, None, "Done", None)
+                        self.nt.send_to_master(done)
 
     '''
     Notify server @dest_id about its joining. '''
@@ -257,14 +256,22 @@ class Server:
         rand_dest = random.sample(self.server_list, 1)[0]
         while rand_dest == self.node_id:
             rand_dest = random.sample(self.server_list, 1)[0]
-        self.anti_entropy(rand_dest)
+        succeed_anti = self.anti_entropy(rand_dest)
 
+        # select a new primary
+        if self.is_retired and succeed_anti:
+            m_elect = Message(self.sender_id, self.unique_id, "Elect",
+                              None)
+            self.nt.send_to_node(rand_dest, m_elect)
+
+        # finish the anti-entropy
         m_finish = Message(self.node_id, self.unique_id, "AntiEn_Finsh", None)
         self.nt.send_to_node(rand_dest, m_finish)
 
-        if self.is_retired:
+        if self.is_retired and succeed_anti:
             m_retire = Message(self.node_id, None, "Retire", None)
             self.nt.send_to_master(m_retire)
+
 
         threading.Timer(self.ANTI_ENTROPY_TIME, self.timer_anti_entropy).start()
 
@@ -275,20 +282,25 @@ class Server:
     '''
     Primary commits periodically. '''
     def timer_primary_commit(self):
-        if TERM_LOG:
-            print(self.uid, "tries to acquire a c_antientropy lock in timer_primary_commit")
-        self.c_antientropy.acquire()
-        if TERM_LOG:
-            print(self.uid, "acquires a c_antientropy lock in timer_primary_commit")
+        if self.is_primary:
+            if TERM_LOG:
+                print(self.uid, "tries to acquire a c_antientropy lock in timer_primary_commit")
+            self.c_antientropy.acquire()
+            if TERM_LOG:
+                print(self.uid, "acquires a c_antientropy lock in timer_primary_commit")
 
-        for wx in self.tentative_log:
-            wx.state = "COMMITTED"
-            wx.CSN   = self.CSN + 1
-            self.receive_server_writes(wx)
-        self.tentative_log = []
-        self.c_antientropy.release()
-        if TERM_LOG:
-            print(self.uid, "releases a c_antientropy lock in timer_primary_commit")
+            for wx in self.tentative_log:
+                wx.state = "COMMITTED"
+                wx.CSN   = self.CSN + 1
+                self.receive_server_writes(wx)
+            self.tentative_log = []
+
+            if self.is_retired:
+                self.is_primary = False
+
+            self.c_antientropy.release()
+            if TERM_LOG:
+                print(self.uid, "releases a c_antientropy lock in timer_primary_commit")
 
         threading.Timer(self.PRIMARY_COMMIT_TIME,
                         self.timer_primary_commit).start()
@@ -300,12 +312,15 @@ class Server:
         m_request_anti = Message(self.node_id, self.unique_id, "RequestAntiEn",
                                  None)
         self.m_anti_entropy = None
-        self.nt.send_to_node(receiver_id, m_request_anti)
+        if not self.nt.send_to_node(receiver_id, m_request_anti):
+            return False
         self.c_request_antientropy.acquire()
         while True:
             if self.m_anti_entropy:
                 break
             self.c_request_antientropy.wait()
+        if isinstance(self.m_anti_entropy, Message): # was rejected
+            return False
 
         m_anti_entropy = self.m_anti_entropy
 
@@ -346,6 +361,7 @@ class Server:
                 self.nt.send_to_node(receiver_id, m_write)
 
         self.c_request_antientropy.release()
+        return True
 
     '''
     Receive_Writes in paper Bayou, client part. '''
