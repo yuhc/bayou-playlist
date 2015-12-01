@@ -41,6 +41,7 @@ class Server:
         # create the network controller
         self.server_list = set() # created by Creation Write
         self.client_list = set() # modified by master
+        self.block_list  = set() # list of blocked connections
         self.nt = Network(self.uid)
         try:
             self.t_recv = Thread(target=self.receive)
@@ -118,7 +119,8 @@ class Server:
 
                 elif buf.mtype == "RequestAntiEn":
                     # unknown server or itself retires
-                    if not buf.sender_id in self.server_list or self.is_retired:
+                    if not buf.sender_id in self.server_list or \
+                       buf.sender_id in self.block_list or self.is_retired:
                         m_reject_anti = Message(self.node_id, self.unique_id,
                                                 "AntiEn_Reject", None)
                         self.nt.send_to_node(buf.sender_id, m_reject_anti)
@@ -143,7 +145,7 @@ class Server:
 
                 elif buf.mtype == "AntiEn_Reject":
                     self.m_anti_entropy = Message(None, None, None, "Reject")
-                    self.c_request_antientropy.release()
+                    self.c_antientropy.release()
                     if TERM_LOG:
                         print(self.uid, "releases a c_request_antientropy lock in receive.AntiEn_Reject")
 
@@ -169,14 +171,22 @@ class Server:
 
                 # from master
                 elif buf.mtype == "Break":
-                    self.server_list.remove(buf.content)
-                    self.client_list.remove(buf.content)
+                    try:
+                        self.server_list.remove(buf.content)
+                    except:
+                        pass
+                    try:
+                        self.client_list.remove(buf.content)
+                    except:
+                        pass
+                    self.block_list.add(buf.content)
 
                 elif buf.mtype == "Restore":
                     if buf.content[0] == "Server":
                         self.server_list.add(buf.content[1])
                     else:
                         self.client_list.add(buf.content[2])
+                    self.block_list.remove(buf.content)
 
                 elif buf.mtype == "Pause":
                     self.is_paused = True
@@ -254,7 +264,7 @@ class Server:
             print(self.uid, "acquires a c_antientropy lock in timer_anti_entropy")
 
         rand_dest = random.sample(self.server_list, 1)[0]
-        while rand_dest == self.node_id:
+        while rand_dest == self.node_id or rand_dest in self.block_list:
             rand_dest = random.sample(self.server_list, 1)[0]
         succeed_anti = self.anti_entropy(rand_dest)
 
@@ -374,6 +384,10 @@ class Server:
         self.bayou_write(w)
 
     def receive_server_writes(self, w):
+        # rewrite Creation's wid
+        if w.mtype == "Creation":
+            w.wid = (w.accept_time, w.sender_uid)
+
         if w.state == "COMMITTED":
             insert_point = len(self.committed_log)
             for i in range(len(self.committed_log)):
