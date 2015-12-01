@@ -211,8 +211,8 @@ class Server:
                         self.c_antientropy.release()
                         if TERM_LOG:
                             print(self.uid, "releases a c_antientropy lock in receive.Write.Client")
-                    done = Message(self.node_id, None, "Done", None)
-                    self.nt.send_to_master(done)
+                        done = Message(self.node_id, None, "Done", None)
+                        self.nt.send_to_master(done)
 
     '''
     Notify server @dest_id about its joining. '''

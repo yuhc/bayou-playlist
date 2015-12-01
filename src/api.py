@@ -21,19 +21,14 @@ clients = {} # list of clients
 has_received_log = False
 has_received_res = False
 has_retired_res = False
+c_has_received_res = Condition()
 
 uid = "Master#0"
 nt  = Network(uid)
-try:
-    self.t_recv = Thread(target=receive)
-    self.t_recv.daemon = True
-    self.t_recv.start()
-except:
-    print(uid, "error: unable to start new thread")
 
-def receive(self):
+def receive():
     while 1:
-        buf = self.nt.receive()
+        buf = nt.receive()
         if buf:
             if TERM_LOG:
                 print(uid, "handles:", str(buf))
@@ -43,12 +38,28 @@ def receive(self):
                 has_received_log = True
             elif buf.mtype == "MGetAck":
                 print(uid, buf.content)
+                c_has_received_res.acquire()
                 has_received_res = True
+                c_has_received_res.notify()
+                c_has_received_res.release()
             elif buf.mtype == "Done": # done processing put/delete
+                c_has_received_res.acquire()
+                print("XXXXXXXXXXXXXXXXXX Receives Done")
                 has_received_res = True
+                c_has_received_res.notify()
+                c_has_received_res.release()
             elif buf.mtype == "RetireAck":
+                c_has_received_res.acquire()
                 has_retired_res = True
+                c_has_received_res.notify()
+                c_has_received_res.release()
 
+try:
+    t_recv = Thread(target=receive)
+    t_recv.daemon = True
+    t_recv.start()
+except:
+    print(uid, "error: unable to start new thread")
 
 def joinServer(server_id):
     if not server_id in nodes:
@@ -75,7 +86,6 @@ def retireServer(server_id):
     if servers[server_id]:
         m_retire = Message(-1, None, "Retire", None)
         nt.send_to_server(server_id, m_retire)
-        c_has_retired.acquire()
         while not has_retired_res:
             pass
         nodes.remove(server_id)
@@ -156,8 +166,15 @@ def put(client_id, song_name, url):
         m_put = Message(-1, None, "Put", song_name + ' ' + url)
         has_received_res = False
         nt.send_to_node(client_id, m_put)
-        while not has_received_res:
-            pass
+        # while not has_received_res:
+        #     pass
+        c_has_received_res.acquire()
+        while True:
+            if has_received_res:
+                break
+            c_has_received_res.wait()
+        c_has_received_res.release()
+        print("XXXXXXXXXXXXXX Done")
 
 
 def get(client_id, song_name):
@@ -165,17 +182,28 @@ def get(client_id, song_name):
         m_get = Message(-1, None, "Get", song_name)
         has_received_res = False
         nt.send_to_node(client_id, m_get)
-        while not has_received_res:
-            pass
-
+        # while not has_received_res:
+        #     pass
+        c_has_received_res.acquire()
+        while True:
+            if has_received_res:
+                break
+            c_has_received_res.wait()
+        c_has_received_res.release()
 
 def delete(client_id, song_name):
     if client_id in clients:
         m_delete = Message(-1, None, "Delete", song_name)
         has_received_res = False
         nt.send_to_node(client_id, m_delete)
-        while not has_received_res:
-            pass
+        # while not has_received_res:
+        #     pass
+        c_has_received_res.acquire()
+        while True:
+            if has_received_res:
+                break
+            c_has_received_res.wait()
+        c_has_received_res.release()
 
 
 def exit():
