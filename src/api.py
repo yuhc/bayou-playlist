@@ -17,10 +17,11 @@ STABILIZE_TIME = 2
 nodes   = [] # list of nodes
 servers = {} # list of servers
 clients = {} # list of clients
+primary = 0  # primary id
 
 has_received_log = False
 has_received_res = False
-has_retired_res = False
+has_retired_res  = False
 
 uid = "Master#0"
 nt  = Network(uid)
@@ -31,7 +32,7 @@ try:
 except:
     print(uid, "error: unable to start new thread")
 
-def receive(self):
+def receive():
     while 1:
         buf = self.nt.receive()
         if buf:

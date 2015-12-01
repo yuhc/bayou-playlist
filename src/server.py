@@ -114,10 +114,16 @@ class Server:
                                      self.accept_time, self.unique_id)
                     self.c_antientropy.acquire()
                     self.receive_server_writes(w_retire)
+
+                    # select a new primary
+                    m_elect = Message(self.sender_id, self.unique_id, "Elect",
+                                      None)
+                    self.nt.send_to_node #TODO
                     self.c_antientropy.release()
 
                 elif buf.mtype == "RequestAntiEn":
-                    if not buf.sender_id in self.server_list: # unknown server
+                    # unknown server or itself retires
+                    if not buf.sender_id in self.server_list or self.is_retired:
                         m_reject_anti = Message(self.node_id, self.unique_id,
                                                 "AntiEn_Reject", None)
                         self.nt.send_to_node(buf.sender_id, m_reject_anti)
@@ -193,6 +199,9 @@ class Server:
                     self.nt.send_to_node(buf.sender_id, m_get)
 
                 elif buf.mtype == "Write":
+                    if self.is_retired:
+                        continue
+
                     if buf.sender_id in self.server_list:
                         if TERM_LOG:
                             print(self.uid, " receives a write from Server#",
