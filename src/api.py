@@ -43,11 +43,11 @@ class API:
                     print(self.uid, "handles:", str(buf))
 
                 if buf.mtype == "Playlist":
-                    print(self.uid, buf.content)
+                    print(buf.content)
                     self.has_received_log = True
 
                 elif buf.mtype == "MGetAck":
-                    print(self.uid, buf.content)
+                    print(buf.content)
                     self.c_has_received_res.acquire()
                     self.has_received_res = True
                     self.c_has_received_res.notify()
@@ -55,11 +55,15 @@ class API:
 
                 elif buf.mtype == "Done": # done processing put/delete
                     self.c_has_received_res.acquire()
-                    self.has_retired_res = True
-                    print("in receive done", self.has_retired_res)
+                    if TERM_LOG:
+                        print(self.uid, "acquires c_has_received_res in receive.Done")
+                    self.has_received_res = True
                     self.c_has_received_res.notify()
-                    print("in receive done", self.has_retired_res)
+                    if TERM_LOG:
+                        print(self.uid, "notifies c_has_received_res in receive.Done")
                     self.c_has_received_res.release()
+                    if TERM_LOG:
+                        print(self.uid, "releases c_has_received_res in receive.Done")
 
                 elif buf.mtype == "RetireAck":
                     self.c_has_received_res.acquire()
@@ -156,7 +160,7 @@ class API:
 
 
     def stabilize(self):
-        time.sleep(STABILIZE_TIME*len(server_list))
+        time.sleep(self.STABILIZE_TIME*len(self.servers))
 
 
     def printLog(self, server_id):
@@ -171,20 +175,14 @@ class API:
     def put(self, client_id, song_name, url):
         if client_id in self.clients:
             m_put = Message(-1, None, "Put", song_name + ' ' + url)
-            print("put before", self.has_received_res)
             self.has_received_res = False
             self.nt.send_to_node(client_id, m_put)
-            print("after before", self.has_received_res)
-            # while not self.has_received_res:
-            #     pass
+
             self.c_has_received_res.acquire()
-            print("acquires lock")
             while True:
                 if self.has_received_res:
                     break
                 self.c_has_received_res.wait()
-                print("in loop", self.has_received_res)
-            print("XXXXXXXXXXXXXX Done")
             self.c_has_received_res.release()
 
 

@@ -75,7 +75,7 @@ class Client:
                 elif buf.mtype == "GetAck":
                     (song_name, song_url, server_CSN) = buf.content
                     get_content = ""
-                    if (self.readset > server_CSN):
+                    if (self.read_set > server_CSN):
                         get_content = song_name+":ERR_DEP"
                     else:
                         self.read_set = server_CSN
