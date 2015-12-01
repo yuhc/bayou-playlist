@@ -3,15 +3,17 @@
 import fileinput
 import string
 import subprocess, sys, os, signal, time
-import api
 
 from threading import Thread, Lock
 from network   import Network
+from api       import API, CMD_DEBUG
 
 
 if __name__ == "__main__":
+    api = API()
+
     for line in fileinput.input():
-        if api.CMD_DEBUG:
+        if CMD_DEBUG:
             print("#", line.strip())
 
         line = line.split()
