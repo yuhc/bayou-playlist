@@ -42,6 +42,7 @@ class Client:
                     w = Write(self.node_id, None, "Put", None, 0,
                               buf.content)
                     m_put = Message(self.node_id, None, "Write", w)
+                    print(self.uid, w)
                     c_can_send_to_server.acquire()
                     while True:
                         if self.can_send_to_server:

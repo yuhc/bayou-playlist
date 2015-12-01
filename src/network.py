@@ -85,9 +85,9 @@ class Network:
                                               csn, committed_log, tentative_log)
                     if content[0] == "Write":
                         (sender_id, sender_uid, mtype, csn, accept_time,
-                         content) = content[1:]
+                         content, state, wid) = content[1:]
                         message.content = Write(sender_id, sender_uid, mtype,
-                                                csn, accept_time, content)
+                                                csn, accept_time, content, state, wid)
             else:
                 if TERM_LOG:
                     print(self.uid, "receives unrecognized message:",
