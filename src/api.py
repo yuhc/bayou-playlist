@@ -27,6 +27,10 @@ uid = "Master#0"
 nt  = Network(uid)
 
 def receive():
+    global has_received_res
+    global c_has_received_res
+    global has_retired_res
+    global has_received_log
     while 1:
         buf = nt.receive()
         if buf:
@@ -45,7 +49,7 @@ def receive():
             elif buf.mtype == "Done": # done processing put/delete
                 c_has_received_res.acquire()
                 print("XXXXXXXXXXXXXXXXXX Receives Done")
-                has_received_res = True
+                has_retired_res = True
                 c_has_received_res.notify()
                 c_has_received_res.release()
             elif buf.mtype == "RetireAck":
@@ -173,8 +177,8 @@ def put(client_id, song_name, url):
             if has_received_res:
                 break
             c_has_received_res.wait()
-        c_has_received_res.release()
         print("XXXXXXXXXXXXXX Done")
+        c_has_received_res.release()
 
 
 def get(client_id, song_name):
