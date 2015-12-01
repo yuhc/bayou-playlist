@@ -9,5 +9,5 @@ class Config:
 
     client_log           = False
 
-    master_log           = True
+    master_log           = False
     master_cmd           = True
