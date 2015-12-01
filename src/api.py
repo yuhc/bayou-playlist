@@ -7,9 +7,10 @@ from server    import Server
 from client    import Client
 from message   import Message
 from network   import Network
+from config    import Config
 
-TERM_LOG  = True
-CMD_DEBUG = True
+TERM_LOG  = Config.master_log
+CMD_DEBUG = Config.master_cmd
 
 STABILIZE_TIME = 2
 
@@ -21,9 +22,18 @@ has_received_log = False
 has_received_res = False
 has_retired_res = False
 
-def receive():
+uid = "Master#0"
+nt  = Network(uid)
+try:
+    self.t_recv = Thread(target=receive)
+    self.t_recv.daemon = True
+    self.t_recv.start()
+except:
+    print(uid, "error: unable to start new thread")
+
+def receive(self):
     while 1:
-        buf = nt.receive()
+        buf = self.nt.receive()
         if buf:
             if TERM_LOG:
                 print(uid, "handles:", str(buf))
@@ -38,12 +48,6 @@ def receive():
                 has_received_res = True
             elif buf.mtype == "RetireAck":
                 has_retired_res = True
-
-uid = "Master#0"
-nt  = Network(uid)
-t_recv = Thread(target=receive)
-t_recv.daemon = True
-t_recv.start()
 
 
 def joinServer(server_id):

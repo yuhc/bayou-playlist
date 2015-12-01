@@ -5,8 +5,9 @@ import string, sys, threading
 from network   import Network
 from threading import Thread, Lock, Condition
 from message   import AntiEntropy, Write, Message
+from config    import Config
 
-TERM_LOG = True
+TERM_LOG = Config.client_log
 
 c_can_send_to_server = Condition()
 

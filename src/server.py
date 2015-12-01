@@ -5,8 +5,9 @@ import sys, string, random, threading, copy
 from network   import Network
 from threading import Thread, Lock, Condition
 from message   import AntiEntropy, Write, Message
+from config    import Config
 
-TERM_LOG = False
+TERM_LOG = Config.server_log
 
 class Server:
 
