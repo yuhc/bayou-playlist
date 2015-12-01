@@ -382,16 +382,15 @@ class Server:
 
     '''
     Receive_Writes in paper Bayou, client part. '''
-    def receive_client_writes(self, w):
+    def receive_client_writes(self, wx):
+        w = copy.deepcopy(wx)
         w.sender         = self.node_id
         w.sender_uid     = self.unique_id
         w.accept_time    = self.accept_time
         w.wid            = (self.accept_time, self.unique_id)
-        self.tentative_log.append(w)
         self.bayou_write(w)
 
     def receive_server_writes(self, w):
-        print(self.uid, "receives", str(w), "from", w.sender_id, w.state)
         # rewrite Creation's wid
         if w.mtype == "Creation":
             w.wid = (w.accept_time, w.sender_uid)
@@ -426,12 +425,10 @@ class Server:
 
             # tentative roll forward
             ww.state = "TENTATIVE"
-
             try:
                 self.tentative_log.remove(ww)
             except:
                 pass
-            print(ww, self.tentative_log)
             tmp_tentative_log = copy.deepcopy(self.tentative_log)
             self.tentative_log = []
             for wx in tmp_tentative_log:
@@ -439,7 +436,6 @@ class Server:
             print(self.uid, "final COMMIT", "commit", self.committed_log, "tentative", self.tentative_log)
 
         else:
-            # print("before insert", self.uid, "commit", self.committed_log, "tentative", self.tentative_log)
             insert_point = len(self.tentative_log)
             for i in range(len(self.tentative_log)):
                 if self.tentative_log[i].wid == w.wid:
