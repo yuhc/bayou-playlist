@@ -29,9 +29,9 @@ class API:
         self.uid = "Master#0"
         self.nt  = Network(self.uid)
         try:
-            t_recv = Thread(target=self.receive)
-            t_recv.daemon = True
-            t_recv.start()
+            self.t_recv = Thread(target=self.receive)
+            self.t_recv.daemon = True
+            self.t_recv.start()
         except:
             print(uid, "error: unable to start new thread")
 
