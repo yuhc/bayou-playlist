@@ -21,3 +21,7 @@ put 11 uvw xyz1234
 stabilize
 printLog 4
 get 12 klm
+get 12 abc
+git 10 abc
+get 11 abc
+get 10 uvw

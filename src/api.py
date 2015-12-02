@@ -15,7 +15,7 @@ CMD_DEBUG = Config.master_cmd
 class API:
 
     START_SERVER_TIME = 0.3
-    STABILIZE_TIME    = 3.5
+    STABILIZE_TIME    = 4
 
     def __init__(self):
         self.nodes    = [] # list of nodes
