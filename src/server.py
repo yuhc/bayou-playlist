@@ -496,6 +496,7 @@ class Server:
             cmd = w.content.split(' ')
             self.playlist[cmd[0]] = cmd[1]
         elif w.mtype == "Delete":
+            cmd = w.content
             self.playlist.pop(cmd)
         elif w.mtype == "Creation":
             self.server_list.add(w.sender_id)
