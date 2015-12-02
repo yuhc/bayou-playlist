@@ -521,9 +521,7 @@ class Server:
             elif wx.mtype == "Delete":
                 plog = plog + "DELETE:(" + wx.content + "):FALSE\n"
 
-        print(self.committed_log, self.tentative_log)
         m_log = Message(self.node_id, None, "Playlist", plog)
-        print(m_log)
         self.nt.send_to_master(m_log)
 
     def __str__(self):
