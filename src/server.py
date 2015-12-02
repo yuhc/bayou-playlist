@@ -27,7 +27,8 @@ class Server:
         self.is_paused  = False
 
         self.version_vector = {} # unique_id: accept_time
-        self.version_vector[self.unique_id] = 1
+        if is_primary:
+            self.version_vector[self.unique_id] = 1
 
         self.playlist = {}      # song_name: url
         self.history  = []      # list of history playlists
@@ -113,7 +114,7 @@ class Server:
                     self.is_retired = True
                     self.accept_time = self.accept_time + 1
                     self.version_vector[self.unique_id] = self.accept_time
-                    w_retire = Write(self.sender_id, self.unique_id,
+                    w_retire = Write(self.node_id, self.unique_id,
                                      "Retirement", None,
                                      self.accept_time, self.unique_id)
                     self.c_antientropy.acquire()
@@ -284,9 +285,12 @@ class Server:
 
         # select a new primary
         if self.is_retired and succeed_anti:
-            m_elect = Message(self.sender_id, self.unique_id, "Elect",
+            m_elect = Message(self.node_id, self.unique_id, "Elect",
                               None)
             self.nt.send_to_node(rand_dest, m_elect)
+            m_retire = Message(self.node_id, self.unique_id,
+                               "RetireAck", None)
+            self.nt.send_to_master(m_retire)
 
         # finish the anti-entropy
         m_finish = Message(self.node_id, self.unique_id, "AntiEn_Finsh", None)
@@ -496,8 +500,10 @@ class Server:
         elif w.mtype == "Creation":
             self.server_list.add(w.sender_id)
         elif w.mtype == "Retirement":
-            self.server_list.remove(w.sender_id)
-            self.version_vector.pop(w.content)
+            try:
+                self.version_vector.pop(w.content)
+            except:
+                pass
         if w.state == "COMMITTED":
             w.CSN = self.CSN + 1
             self.committed_log.append(w)

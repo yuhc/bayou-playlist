@@ -97,7 +97,7 @@ class API:
     def retireServer(self, server_id):
         if self.servers[server_id]:
             m_retire = Message(-1, None, "Retire", None)
-            self.nt.send_to_server(server_id, m_retire)
+            self.nt.send_to_node(server_id, m_retire)
             while not self.has_retired_res:
                 pass
             self.nodes.remove(server_id)
