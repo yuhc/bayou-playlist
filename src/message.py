@@ -77,7 +77,7 @@ class Write:
         return self.mtype in ["Creation", "Retirement"]
 
     def __eq__(self, other):
-        return self.__dict__ == other.__dict__
+        return self.__str__() == other.__str__()
 
     '''
     Message format:
