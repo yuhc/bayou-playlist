@@ -1,0 +1,11 @@
+joinServer 0
+joinServer 1
+joinServer 2
+joinClient 3 0
+joinClient 4 1
+joinClient 5 2
+retireServer 1
+put 5 eyesOfTexas cs.utexas.edu
+get 5 eyesOfTexas
+get 3 eyesOfTexas
+printLog 0

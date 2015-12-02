@@ -1,0 +1,40 @@
+joinServer 0
+joinServer 1
+joinServer 4
+joinServer 5
+joinClient 2 0
+joinClient 3 1
+joinClient 6 4
+joinClient 7 5
+pause
+breakConnection 0 1
+breakConnection 0 4
+breakConnection 0 5
+start
+put 2 eyesOfTexas utexas.edu
+put 3 eyesOfTexas cs.utexas.edu
+put 6 eyesOfTexas lol
+put 7 eyesOfTexas idkman
+stabilize
+get 2 eyesOfTexas
+get 3 eyesOfTexas
+get 6 eyesOfTexas
+get 7 eyesOfTexas
+stabilize
+printLog 1
+printLog 4
+printLog 5
+pause
+restoreConnection 0 1
+restoreConnection 0 4
+restoreConnection 0 5
+start
+stabilize
+get 2 eyesOfTexas
+get 3 eyesOfTexas
+get 6 eyesOfTexas
+get 7 eyesOfTexas
+printLog 0
+printLog 1
+printLog 4
+printLog 5
