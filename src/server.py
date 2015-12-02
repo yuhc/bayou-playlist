@@ -11,8 +11,8 @@ TERM_LOG = Config.server_log
 
 class Server:
 
-    ANTI_ENTROPY_TIME   = 1.5
-    PRIMARY_COMMIT_TIME = 1.5
+    ANTI_ENTROPY_TIME   = 0.5
+    PRIMARY_COMMIT_TIME = 0.5
     c_create = Condition()
     c_request_antientropy = Condition()
     c_antientropy = Lock()
@@ -39,9 +39,11 @@ class Server:
         self.tentative_log = [] # list of writes
 
         # create the network controller
-        self.server_list = set() # created by Creation Write
-        self.client_list = set() # modified by master
-        self.block_list  = set() # list of blocked connections
+        self.server_list    = set() # created by Creation Write
+        self.client_list    = set() # modified by master
+        self.block_list     = set() # list of blocked connections
+        self.available_list = set() # last available
+        self.rand_dest      = -1    # last anti-entropy partner id
         self.nt = Network(self.uid)
         try:
             self.t_recv = Thread(target=self.receive)
@@ -173,22 +175,17 @@ class Server:
 
                 # from master
                 elif buf.mtype == "Break":
-                #     try:
-                #         self.server_list.remove(buf.content)
-                #     except:
-                #         pass
-                #     try:
-                #         self.client_list.remove(buf.content)
-                #     except:
-                #         pass
                     self.block_list.add(buf.content)
 
                 elif buf.mtype == "Restore":
                     if buf.content[0] == "Server":
                         self.server_list.add(buf.content[1])
                     else:
-                        self.client_list.add(buf.content[2])
-                    self.block_list.remove(buf.content)
+                        self.client_list.add(buf.content[1])
+                    try:
+                        self.block_list.remove(buf.content[1])
+                    except:
+                        pass
 
                 elif buf.mtype == "Pause":
                     self.is_paused = True
@@ -201,6 +198,7 @@ class Server:
 
                 elif buf.mtype == "Get":
                     song_name = buf.content
+                    # print(self.uid, song_name, self.playlist, self.committed_log, self.tentative_log)
                     try:
                         song_url  = self.playlist[song_name]
                     except:
@@ -255,6 +253,8 @@ class Server:
     '''
     Process Anti-Entropy periodically. '''
     def timer_anti_entropy(self):
+        if TERM_LOG:
+            print(self.uid, "current lists: server_list", self.server_list, "block_list", self.block_list)
         available_list = copy.deepcopy(self.server_list)
         for s in self.server_list:
             if s in self.block_list:
@@ -270,9 +270,14 @@ class Server:
         if TERM_LOG:
             print(self.uid, "acquires a c_antientropy lock in timer_anti_entropy")
 
-        rand_dest = random.sample(available_list, 1)[0]
-        while rand_dest in self.block_list:
-            rand_dest = random.sample(available_list, 1)[0]
+        if available_list == self.available_list: # available_list unchanged
+            rand_dest = (self.rand_dest + 1) % len(available_list)
+        else:
+            rand_dest = random.randint(0, len(available_list)-1)
+        self.available_list = copy.deepcopy(available_list)
+        self.rand_dest = rand_dest
+        rand_dest = list(available_list)[rand_dest]
+
         if TERM_LOG:
             print(self.uid, " selects to anti-entropy with Server#", rand_dest, sep="")
         succeed_anti = self.anti_entropy(rand_dest)
@@ -379,7 +384,7 @@ class Server:
                 self.nt.send_to_node(receiver_id, m_commit)
         # tentative log
         for w in self.tentative_log:
-            if w.sender_uid in R_version_vector and \
+            if not w.sender_uid in R_version_vector or \
                R_version_vector[w.sender_uid] < w.accept_time:
                 m_write = Message(self.node_id, self.unique_id, "Write", w)
                 self.nt.send_to_node(receiver_id, m_write)
@@ -452,9 +457,8 @@ class Server:
                 if self.tentative_log[i].wid > w.wid:
                     insert_point = i
                     break
-            # rollback
-            # print("insert_point", w, insert_point)
 
+            # rollback
             total_point = insert_point + len(self.committed_log)
             suffix_tentative_log = self.tentative_log[insert_point:]
             if total_point == 0:
@@ -467,16 +471,14 @@ class Server:
                 self.tentative_log = []
             else:
                 self.tentative_log = self.tentative_log[:insert_point]
+
             # insert w
             self.bayou_write(w)
             # roll forward
-            #self.tentative_log.remove(w)
-            #tmp_tentative_log = copy.deepcopy(self.tentative_log)
-            #self.tentative_log = []
             for wx in suffix_tentative_log:
                 self.bayou_write(wx)
             if TERM_LOG:
-                print(self.uid, "<Final TENTATIVE>", "commit", self.committed_log, "tentative", self.tentative_log)
+                print(self.uid, "<FINAL TENTATIVE>", "commit", self.committed_log, "tentative", self.tentative_log)
 
     '''
     Bayou_Write in paper Bayou. '''

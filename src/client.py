@@ -42,7 +42,6 @@ class Client:
                     w = Write(self.node_id, None, "Put", None, 0,
                               buf.content)
                     m_put = Message(self.node_id, None, "Write", w)
-                    print(self.uid, w)
                     c_can_send_to_server.acquire()
                     while True:
                         if self.can_send_to_server:
@@ -53,13 +52,19 @@ class Client:
 
                 elif buf.mtype == "Get":
                     m_get = Message(self.node_id, None, "Get", buf.content)
+                    if TERM_LOG:
+                        print(self.uid, "tries to acquire c_can_send_to_server in receive.Get")
                     c_can_send_to_server.acquire()
+                    if TERM_LOG:
+                        print(self.uid, "acquires c_can_send_to_server in receive.Get")
                     while True:
                         if self.can_send_to_server:
                             break
                         c_can_send_to_server.wait()
                     self.nt.send_to_node(self.connected_server, m_get)
                     c_can_send_to_server.release()
+                    if TERM_LOG:
+                        print(self.uid, "releases c_can_send_to_server in receive.Get")
 
                 elif buf.mtype == "Delete":
                     w = Write(self.node_id, None, "Delete", None, 0,

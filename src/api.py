@@ -14,7 +14,8 @@ CMD_DEBUG = Config.master_cmd
 
 class API:
 
-    STABILIZE_TIME = 2
+    START_SERVER_TIME = 0.3
+    STABILIZE_TIME    = 3.5
 
     def __init__(self):
         self.nodes   = [] # list of nodes
@@ -29,9 +30,9 @@ class API:
         self.uid = "Master#0"
         self.nt  = Network(self.uid)
         try:
-            self.t_recv = Thread(target=self.receive)
-            self.t_recv.daemon = True
-            self.t_recv.start()
+            t_recv = Thread(target=self.receive)
+            t_recv.daemon = True
+            t_recv.start()
         except:
             print(uid, "error: unable to start new thread")
 
@@ -80,8 +81,8 @@ class API:
                                   str(False) if self.servers else str(True)])
             self.servers[server_id] = p.pid
             self.nodes.append(server_id)
-            #TODO: wait for ack
-            time.sleep(1)
+
+            time.sleep(self.START_SERVER_TIME)
             if TERM_LOG:
                 print("Server#", server_id, " pid:", p.pid, sep="")
 
@@ -135,12 +136,12 @@ class API:
 
     def restoreConnection(self, id1, id2):
         if id1 in self.nodes and id2 in self.nodes:
-            if id1 in self.server_list:
+            if id1 in self.servers:
                 m_break = Message(-1, None, "Restore", ("Server", id1))
             else:
                 m_break = Message(-1, None, "Restore", ("Client", id1))
             self.nt.send_to_node(id2, m_break)
-            if id2 in self.server_list:
+            if id2 in self.servers:
                 m_break = Message(-1, None, "Restore", ("Server", id2))
             else:
                 m_break = Message(-1, None, "Restore", ("Client", id2))

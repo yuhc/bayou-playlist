@@ -7,7 +7,7 @@ class Config:
 
     server_log           = False
 
-    client_log           = True
+    client_log           = False
 
     master_log           = False
     master_cmd           = True
