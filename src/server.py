@@ -527,12 +527,12 @@ class Server:
             if wx.mtype == "Put":
                 plog = plog + "PUT:(" + contents[0] + ", " + contents[1] + "):TRUE\n"
             elif wx.mtype == "Delete":
-                plog = plog + "DELETE:(" + contents[0] + ", " + contents[1] + "):TRUE\n"
+                plog = plog + "DELETE:(" + contents[0] + "):TRUE\n"
         for wx in self.tentative_log:
             if wx.mtype == "Put":
                 plog = plog + "PUT:(" + contents[0] + ", " + contents[1] + "):FALSE\n"
             elif wx.mtype == "Delete":
-                plog = plog + "DELETE:(" + contents[0] + ", " + contents[1] + "):FALSE\n"
+                plog = plog + "DELETE:(" + contents[0] + "):FALSE\n"
 
         m_log = Message(self.node_id, None, "Playlist", plog)
         self.nt.send_to_master(m_log)
