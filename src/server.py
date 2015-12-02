@@ -11,8 +11,8 @@ TERM_LOG = Config.server_log
 
 class Server:
 
-    ANTI_ENTROPY_TIME   = 2
-    PRIMARY_COMMIT_TIME = 2
+    ANTI_ENTROPY_TIME   = 1.5
+    PRIMARY_COMMIT_TIME = 1.5
     c_create = Condition()
     c_request_antientropy = Condition()
     c_antientropy = Lock()
@@ -120,8 +120,8 @@ class Server:
 
                 elif buf.mtype == "RequestAntiEn":
                     # unknown server or itself retires
-                    if not buf.sender_id in self.server_list or \
-                       buf.sender_id in self.block_list or self.is_retired:
+                    # comment "not buf.sender_id in self.server_list or"
+                    if buf.sender_id in self.block_list or self.is_retired or self.is_paused:
                         m_reject_anti = Message(self.node_id, self.unique_id,
                                                 "AntiEn_Reject", None)
                         self.nt.send_to_node(buf.sender_id, m_reject_anti)
@@ -132,6 +132,7 @@ class Server:
                     self.c_antientropy.acquire()
                     if TERM_LOG:
                         print(self.uid, "acquires a c_antientropy lock in receive.RequestAntiEn")
+                    self.server_list.add(buf.sender_id)
                     a_ack = AntiEntropy(self.node_id, self.version_vector,
                                         self.CSN, self.committed_log,
                                         self.tentative_log)
@@ -216,7 +217,6 @@ class Server:
                         if TERM_LOG:
                             print(self.uid, " receives a write from Server#",
                                   buf.sender_id, sep="")
-                        print(self.uid, "receives server write", buf.content.state)
                         self.receive_server_writes(buf.content)
                     else:
                         if TERM_LOG:
@@ -255,12 +255,13 @@ class Server:
     '''
     Process Anti-Entropy periodically. '''
     def timer_anti_entropy(self):
-        print(self.uid, self.server_list, self.client_list, self.block_list)
         available_list = copy.deepcopy(self.server_list)
         for s in self.server_list:
             if s in self.block_list:
                 available_list.remove(s)
-        if not available_list:
+        if self.node_id in available_list:
+            available_list.remove(self.node_id)
+        if not available_list or self.is_paused:
             threading.Timer(self.ANTI_ENTROPY_TIME,
                             self.timer_anti_entropy).start()
             return
@@ -270,7 +271,7 @@ class Server:
             print(self.uid, "acquires a c_antientropy lock in timer_anti_entropy")
 
         rand_dest = random.sample(available_list, 1)[0]
-        while rand_dest == self.node_id or rand_dest in self.block_list:
+        while rand_dest in self.block_list:
             rand_dest = random.sample(available_list, 1)[0]
         if TERM_LOG:
             print(self.uid, " selects to anti-entropy with Server#", rand_dest, sep="")
@@ -375,7 +376,6 @@ class Server:
                 # if w.accept_time <= R_version_vector[w.sender_uid]:
                 m_commit = Message(self.node_id, self.unique_id,
                                    "Write", w)
-                print(self.uid, "sends", str(w), "to", receiver_id, w.state)
                 self.nt.send_to_node(receiver_id, m_commit)
         # tentative log
         for w in self.tentative_log:
@@ -440,7 +440,9 @@ class Server:
             self.tentative_log = []
             for wx in tmp_tentative_log:
                 self.bayou_write(wx)
-            print(self.uid, "final COMMIT", "commit", self.committed_log, "tentative", self.tentative_log)
+
+            if TERM_LOG:
+                print(self.uid, "<FINAL COMMIT>", "commit", self.committed_log, "tentative", self.tentative_log)
 
         else:
             insert_point = len(self.tentative_log)
@@ -473,7 +475,8 @@ class Server:
             #self.tentative_log = []
             for wx in suffix_tentative_log:
                 self.bayou_write(wx)
-            print(self.uid, "Final TENTATIVE", self.committed_log, "tentative", self.tentative_log)
+            if TERM_LOG:
+                print(self.uid, "<Final TENTATIVE>", "commit", self.committed_log, "tentative", self.tentative_log)
 
     '''
     Bayou_Write in paper Bayou. '''
