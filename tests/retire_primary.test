@@ -1,0 +1,24 @@
+joinServer 0
+joinServer 1
+joinServer 2
+joinServer 3
+joinServer 4
+joinServer 5
+joinServer 6
+joinServer 7
+joinClient 8 0
+joinClient 9 1
+joinClient 10 2
+joinClient 11 3
+joinClient 12 4
+retireServer 0
+put 10 abc defghij
+stabilize
+retireServer 1
+put 9 klm nopqrst
+stabilize
+put 11 uvw xyz1234
+stabilize
+printLog 4
+get 12 butts
+get 8 klm

@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import sys, string, random, threading, copy
+import sys, string, random, threading, copy, signal, os
 
 from network   import Network
 from threading import Thread, Lock, Condition
@@ -299,6 +299,9 @@ class Server:
         if self.is_retired and succeed_anti:
             m_retire = Message(self.node_id, None, "Retire", None)
             self.nt.send_to_master(m_retire)
+            if TERM_LOG:
+                print(self.uid, "kills itself")
+            os.kill(os.getpid(), signal.SIGKILL)
 
 
         threading.Timer(self.ANTI_ENTROPY_TIME, self.timer_anti_entropy).start()
