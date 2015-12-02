@@ -256,7 +256,11 @@ class Server:
     Process Anti-Entropy periodically. '''
     def timer_anti_entropy(self):
         print(self.uid, self.server_list, self.client_list, self.block_list)
-        if not self.server_list:
+        available_list = copy.deepcopy(self.server_list)
+        for s in self.server_list:
+            if s in self.block_list:
+                available_list.remove(s)
+        if not available_list:
             threading.Timer(self.ANTI_ENTROPY_TIME,
                             self.timer_anti_entropy).start()
             return
@@ -265,9 +269,11 @@ class Server:
         if TERM_LOG:
             print(self.uid, "acquires a c_antientropy lock in timer_anti_entropy")
 
-        rand_dest = random.sample(self.server_list, 1)[0]
+        rand_dest = random.sample(available_list, 1)[0]
         while rand_dest == self.node_id or rand_dest in self.block_list:
-            rand_dest = random.sample(self.server_list, 1)[0]
+            rand_dest = random.sample(available_list, 1)[0]
+        if TERM_LOG:
+            print(self.uid, " selects to anti-entropy with Server#", rand_dest, sep="")
         succeed_anti = self.anti_entropy(rand_dest)
 
         # select a new primary
@@ -373,7 +379,8 @@ class Server:
                 self.nt.send_to_node(receiver_id, m_commit)
         # tentative log
         for w in self.tentative_log:
-            if R_version_vector[w.sender_uid] < w.accept_time:
+            if w.sender_uid in R_version_vector and \
+               R_version_vector[w.sender_uid] < w.accept_time:
                 m_write = Message(self.node_id, self.unique_id, "Write", w)
                 self.nt.send_to_node(receiver_id, m_write)
 
