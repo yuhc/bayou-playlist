@@ -20,5 +20,4 @@ stabilize
 put 11 uvw xyz1234
 stabilize
 printLog 4
-get 12 butts
-get 8 klm
+get 12 klm

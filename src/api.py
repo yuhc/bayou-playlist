@@ -18,9 +18,10 @@ class API:
     STABILIZE_TIME    = 3.5
 
     def __init__(self):
-        self.nodes   = [] # list of nodes
-        self.servers = {} # list of servers
-        self.clients = {} # list of clients
+        self.nodes    = [] # list of nodes
+        self.servers  = {} # list of servers
+        self.clients  = {} # list of clients
+        self.client_s = {} # list of clients' partner
 
         self.has_received_log   = False
         self.has_received_res   = False
@@ -109,7 +110,8 @@ class API:
             if self.servers[server_id]:
                 p = subprocess.Popen(["./src/client.py",
                                       str(client_id)])
-                self.clients[client_id] = p.pid
+                self.clients[client_id]  = p.pid
+                self.client_s[client_id] = server_id
                 self.nodes.append(client_id)
                 #TODO: wait for ack
                 time.sleep(1)
@@ -174,7 +176,8 @@ class API:
 
 
     def put(self, client_id, song_name, url):
-        if client_id in self.clients:
+        if client_id in self.clients and self.client_s[client_id] in \
+           self.servers:
             m_put = Message(-1, None, "Put", song_name + ' ' + url)
             self.has_received_res = False
             self.nt.send_to_node(client_id, m_put)
@@ -188,7 +191,8 @@ class API:
 
 
     def get(self, client_id, song_name):
-        if client_id in self.clients:
+        if client_id in self.clients and self.client_s[client_id] in \
+           self.servers:
             m_get = Message(-1, None, "Get", song_name)
             self.has_received_res = False
             self.nt.send_to_node(client_id, m_get)
@@ -202,7 +206,8 @@ class API:
             self.c_has_received_res.release()
 
     def delete(self, client_id, song_name):
-        if client_id in self.clients:
+        if client_id in self.clients and self.client_s[client_id] in \
+           self.servers:
             m_delete = Message(-1, None, "Delete", song_name)
             self.has_received_res = False
             self.nt.send_to_node(client_id, m_delete)
