@@ -31,7 +31,7 @@ class Network:
             self.is_server = True if uid[0] == 'S' else False
             BASE_PORT = self.NODE_BASE_PORT
             TCP_PORT = self.node_id + BASE_PORT
-        self.BUFFER_SIZE = 1024
+        self.BUFFER_SIZE = 20480
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server.bind((self.PRIVATE_TCP_IP, TCP_PORT))
