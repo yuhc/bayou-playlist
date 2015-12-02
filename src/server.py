@@ -521,15 +521,18 @@ class Server:
     def printLog(self):
         plog = ""
         for wx in self.committed_log:
+            contents = []
+            if wx.mtype == "Put" or wx.mtype == "Delete":
+                contents = wx.content.split(' ')
             if wx.mtype == "Put":
-                plog = plog + "PUT:(" + wx.content + "):TRUE\n"
+                plog = plog + "PUT:(" + contents[0] + ", " + contents[1] + "):TRUE\n"
             elif wx.mtype == "Delete":
-                plog = plog + "DELETE:(" + wx.content + "):TRUE\n"
+                plog = plog + "DELETE:(" + contents[0] + ", " + contents[1] + "):TRUE\n"
         for wx in self.tentative_log:
             if wx.mtype == "Put":
-                plog = plog + "PUT:(" + wx.content + "):FALSE\n"
+                plog = plog + "PUT:(" + contents[0] + ", " + contents[1] + "):FALSE\n"
             elif wx.mtype == "Delete":
-                plog = plog + "DELETE:(" + wx.content + "):FALSE\n"
+                plog = plog + "DELETE:(" + contents[0] + ", " + contents[1] + "):FALSE\n"
 
         m_log = Message(self.node_id, None, "Playlist", plog)
         self.nt.send_to_master(m_log)
