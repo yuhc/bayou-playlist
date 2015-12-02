@@ -45,7 +45,8 @@ class API:
                     print(self.uid, "handles:", str(buf))
 
                 if buf.mtype == "Playlist":
-                    print(buf.content.strip())
+                    if buf.content.strip():
+                        print(buf.content.strip())
                     self.has_received_log = True
 
                 elif buf.mtype == "MGetAck":
