@@ -102,9 +102,10 @@ class Server:
                     self.c_create.acquire()
                     if TERM_LOG:
                         print(self.uid, "acquires a c_create lock in receive.Creation_Ack")
-                    self.unique_id   = (buf.content, buf.sender_uid)
-                    self.accept_time = buf.content + 1
-                    self.version_vector[self.unique_id] = self.accept_time
+                    if not self.unique_id in self.version_vector:
+                        self.unique_id   = (buf.content, buf.sender_uid)
+                        self.accept_time = buf.content + 1
+                        self.version_vector[self.unique_id] = self.accept_time
                     self.c_create.notify()
                     self.c_create.release()
                     if TERM_LOG:

@@ -93,7 +93,7 @@ class API:
                 if index != server_id:
                     m_create = Message(-1, None, "Creation", index)
                     self.nt.send_to_node(server_id, m_create)
-                    break
+                    # break
 
 
     def retireServer(self, server_id):
