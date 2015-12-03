@@ -1,0 +1,5 @@
+PUT:(x0, y0):TRUE
+PUT:(x2, y2):TRUE
+PUT:(x0, y0):TRUE
+PUT:(x2, y2):TRUE
+x1:ERR_KEY
