@@ -11,7 +11,6 @@ TERM_LOG = Config.server_log
 
 class Server:
 
-    ANTI_ENTROPY_TIME   = 0.5
     PRIMARY_COMMIT_TIME = 0.5
     c_create = Condition()
     c_request_antientropy = Condition()
@@ -53,17 +52,17 @@ class Server:
         except:
             print(self.uid, "error: unable to start new thread")
 
+        random.seed()
         if is_primary:
             self.accept_time = self.accept_time + 1
             w_create = Write(self.node_id, self.unique_id, "Creation", None,
                              self.accept_time, self.unique_id)
             self.bayou_write(w_create)
-        threading.Timer(self.PRIMARY_COMMIT_TIME,
+            threading.Timer(random.uniform(0.3, 0.7),
                         self.timer_primary_commit).start()
 
         # start Anti-Entropy
-        random.seed()
-        threading.Timer(self.ANTI_ENTROPY_TIME, self.timer_anti_entropy).start()
+        threading.Timer(random.uniform(0.3, 0.7), self.timer_anti_entropy).start()
 
 
     def receive(self):
@@ -264,7 +263,7 @@ class Server:
         if self.node_id in available_list:
             available_list.remove(self.node_id)
         if not available_list or self.is_paused:
-            threading.Timer(self.ANTI_ENTROPY_TIME,
+            threading.Timer(random.uniform(0.3, 0.7),
                             self.timer_anti_entropy).start()
             return
 
@@ -305,7 +304,7 @@ class Server:
             os.kill(os.getpid(), signal.SIGKILL)
 
 
-        threading.Timer(self.ANTI_ENTROPY_TIME, self.timer_anti_entropy).start()
+        threading.Timer(random.uniform(0.3, 0.7), self.timer_anti_entropy).start()
 
         self.c_antientropy.release()
         if TERM_LOG:
@@ -334,7 +333,7 @@ class Server:
             if TERM_LOG:
                 print(self.uid, "releases a c_antientropy lock in timer_primary_commit")
 
-        threading.Timer(self.PRIMARY_COMMIT_TIME,
+            threading.Timer(random.uniform(0.3, 0.7),
                         self.timer_primary_commit).start()
 
     '''
