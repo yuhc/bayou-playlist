@@ -205,7 +205,7 @@ class Server:
                     except:
                         song_url  = "ERR_KEY"
                     m_get = Message(self.node_id, self.unique_id, "GetAck",
-                                    (song_name, song_url, self.CSN))
+                                    (song_name, song_url, self.version_vector))
                     self.nt.send_to_node(buf.sender_id, m_get)
 
                 elif buf.mtype == "Write":
@@ -229,8 +229,8 @@ class Server:
                         self.c_antientropy.release()
                         if TERM_LOG:
                             print(self.uid, "releases a c_antientropy lock in receive.Write.Client")
-                        done = Message(self.node_id, None, "Done", None)
-                        self.nt.send_to_master(done)
+                        done = Message(self.node_id, None, "Done", self.version_vector)
+                        self.nt.send_to_node(buf.sender_id, done)
 
     '''
     Notify server @dest_id about its joining. '''
@@ -379,6 +379,10 @@ class Server:
                                              R_version_vector[v])
             except:
                 pass
+
+        for v in R_version_vector:
+            if not v in self.version_vector:
+                self.version_vector[v] = R_version_vector[v]
 
         # anti-entropy with support for committed writes
         if R_CSN < S_CSN:
