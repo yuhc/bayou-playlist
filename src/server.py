@@ -13,7 +13,9 @@ LOCK_LOG   = Config.server_lock_log
 
 class Server:
 
-    PRIMARY_COMMIT_TIME = 0.5
+    ANTI_ENTROPY_LOWER = Config.anti_entropy_lower
+    ANTI_ENTROPY_UPPER = Config.anti_entropy_upper
+
     c_create = Condition()
     c_request_antientropy = Condition()
     c_antientropy = Lock()
@@ -170,17 +172,20 @@ class Server:
                         print(self.uid, "tries to acquire a c_request_antientropy lock in receive.AntiEn_Ack")
                     self.c_request_antientropy.acquire()
                     if LOCK_LOG:
-                        print(self.uid, "acquires a c_request_antientropy lock in receive.AntiEn_Ack")
+                        print(self.uid, "acquires a c_request_antientropy lock \
+                              in receive.AntiEn_Ack")
                     self.m_anti_entropy = copy.deepcopy(buf.content)
                     self.c_request_antientropy.notify()
                     self.c_request_antientropy.release()
                     if LOCK_LOG:
-                        print(self.uid, "releases a c_request_antientropy lock in receive.AntiEn_Ack")
+                        print(self.uid, "releases a c_request_antientropy lock \
+                              in receive.AntiEn_Ack")
 
                 elif buf.mtype == "AntiEn_Finsh":
                     self.c_antientropy.release()
                     if LOCK_LOG:
-                        print(self.uid, "releases a c_antientropy lock in receive.AntiEn_Finsh")
+                        print(self.uid, "releases a c_antientropy lock in \
+                              receive.AntiEn_Finsh")
 
                 elif buf.mtype == "Elect":
                     self.is_primary = True
@@ -245,18 +250,31 @@ class Server:
     '''
     Notify server @dest_id about its joining. '''
     def notify(self, dest_id):
-        w_write = Write(self.node_id, self.unique_id, "Creation", None, 1, self.first_creation)
-        m_join_server = Message(self.node_id, None, "Creation", w_write)
-        self.first_creation = False # a creation has been sent
-        self.nt.send_to_node(dest_id, m_join_server)
-
         self.c_create.acquire()
         if LOCK_LOG:
             print(self.uid, "acquires a c_create lock in notify")
-        while True:
-            if self.accept_time != 1:
-                break
-            self.c_create.wait()
+
+        if self.first_creation:
+            w_write = Write(self.node_id, self.unique_id, "Creation", None, 1,
+                            self.first_creation)
+            m_join_server = Message(self.node_id, None, "Creation", w_write)
+            self.first_creation = False # a creation has been sent
+            self.nt.send_to_node(dest_id, m_join_server)
+            while True:
+                if self.accept_time != 1:
+                    break
+                self.c_create.wait()
+        else:
+            while True:
+                if self.accept_time != 1:
+                    break
+                self.c_create.wait()
+            w_write = Write(self.node_id, self.unique_id, "Creation", None, 1,
+                            self.first_creation)
+            m_join_server = Message(self.node_id, None, "Creation", w_write)
+            self.first_creation = False # a creation has been sent
+            self.nt.send_to_node(dest_id, m_join_server)
+
         self.server_list.add(dest_id)
         self.c_create.release()
         if LOCK_LOG:
@@ -285,43 +303,50 @@ class Server:
     Create a thread handle AntiEn_Reject. '''
     def handle_antien_reject(self):
         if LOCK_LOG:
-            print(self.uid, "tries to acquire a c_request_antientropy lock in receive.AntiEn_Reject")
+            print(self.uid, "tries to acquire a c_request_antientropy lock in \
+                  receive.AntiEn_Reject")
         self.c_request_antientropy.acquire()
         if LOCK_LOG:
-            print(self.uid, "acquires a c_request_antientropy lock in receive.AntiEn_Reject")
+            print(self.uid, "acquires a c_request_antientropy lock in \
+                  receive.AntiEn_Reject")
         self.m_anti_entropy = Message(None, None, None, "Reject")
         self.c_request_antientropy.notify()
         self.c_request_antientropy.release()
         if LOCK_LOG:
-            print(self.uid, "releases a c_request_antientropy lock in receive.AntiEn_Reject")
-        # self.c_antientropy.release()
-        # if LOCK_LOG:
-        #     print(self.uid, "releases a c_antientropy lock in receive.AntiEn_Reject")
+            print(self.uid, "releases a c_request_antientropy lock in \
+                  receive.AntiEn_Reject")
 
     '''
     Process Anti-Entropy periodically. '''
     def timer_anti_entropy(self):
         if TERM_LOG and DETAIL_LOG:
-            print(self.uid, "current lists: server_list", self.server_list, "block_list", self.block_list)
+            print(self.uid, "current lists: server_list", self.server_list,
+                  "block_list", self.block_list)
         self.available_list = self.available_list.union(self.server_list)
         self.available_list = self.available_list.difference(self.block_list)
         if self.node_id in self.available_list:
             self.available_list.remove(self.node_id)
         if not self.available_list or self.is_paused:
-            threading.Timer(random.randint(5, 10)/100.0,
-                            self.timer_anti_entropy).start()
+            threading.Timer(
+                random.randint(self.ANTI_ENTROPY_LOWER,
+                               self.ANTI_ENTROPY_UPPER)/100.0,
+                self.timer_anti_entropy
+            ).start()
             return
 
         if LOCK_LOG:
-            print(self.uid, "tries to acquire a c_antientropy lock in timer_anti_entropy")
+            print(self.uid, "tries to acquire a c_antientropy lock in \
+                  timer_anti_entropy")
         self.c_antientropy.acquire()
         if LOCK_LOG:
-            print(self.uid, "acquires a c_antientropy lock in timer_anti_entropy")
+            print(self.uid, "acquires a c_antientropy lock in \
+                  timer_anti_entropy")
 
         rand_dest = list(self.available_list)[0]
 
         if TERM_LOG:
-            print(self.uid, " selects to anti-entropy with Server#", rand_dest, sep="")
+            print(self.uid, " selects to anti-entropy with Server#",
+                  rand_dest, sep="")
         succeed_anti = self.anti_entropy(rand_dest)
 
         # select a new primary
@@ -337,7 +362,8 @@ class Server:
         if succeed_anti:
             self.available_list.remove(rand_dest)
             self.sent_list.add(rand_dest)
-            m_finish = Message(self.node_id, self.unique_id, "AntiEn_Finsh", None)
+            m_finish = Message(self.node_id, self.unique_id, "AntiEn_Finsh",
+                               None)
             self.nt.send_to_node(rand_dest, m_finish)
 
         if self.is_retired and succeed_anti:
@@ -348,7 +374,11 @@ class Server:
             os.kill(os.getpid(), signal.SIGKILL)
 
 
-        threading.Timer(random.randint(5, 10)/100.0, self.timer_anti_entropy).start()
+        threading.Timer(
+            random.randint(self.ANTI_ENTROPY_LOWER,
+                           self.ANTI_ENTROPY_UPPER)/100.0,
+            self.timer_anti_entropy
+        ).start()
 
         self.c_antientropy.release()
         if LOCK_LOG:
@@ -359,7 +389,8 @@ class Server:
     Flexible Update Propagation '''
     def anti_entropy(self, receiver_id):
         if TERM_LOG and DETAIL_LOG:
-            print(self.uid, " requests anti-entropy to Server#", receiver_id, sep="")
+            print(self.uid, " requests anti-entropy to Server#",
+                  receiver_id, sep="")
         m_request_anti = Message(self.node_id, self.unique_id, "RequestAntiEn",
                                  None)
         self.m_anti_entropy = None
@@ -402,18 +433,6 @@ class Server:
         S_version_vector = self.version_vector
         S_CSN            = self.CSN
 
-        # update version_vector
-        for v in S_version_vector:
-            try:
-                self.version_vector[v] = max(self.version_vector[v],
-                                             R_version_vector[v])
-            except:
-                pass
-
-        for v in R_version_vector:
-            if not v in self.version_vector:
-                self.version_vector[v] = R_version_vector[v]
-
         # anti-entropy with support for committed writes
         if R_CSN < S_CSN:
             # committed log
@@ -429,6 +448,17 @@ class Server:
                R_version_vector[w.sender_uid] < w.accept_time:
                 m_write = Message(self.node_id, self.unique_id, "Write", w)
                 self.nt.send_to_node(receiver_id, m_write)
+
+        # update version_vector
+        for v in R_version_vector:
+            if not v in self.version_vector:
+                self.version_vector[v] = R_version_vector[v]
+        for v in S_version_vector:
+            try:
+                self.version_vector[v] = max(self.version_vector[v],
+                                             R_version_vector[v])
+            except:
+                pass
 
         self.c_request_antientropy.release()
         if LOCK_LOG:

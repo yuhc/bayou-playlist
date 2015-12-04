@@ -13,3 +13,9 @@ class Config:
 
     master_log           = False
     master_cmd           = True
+
+    stabilize_time       = 10
+    start_server_time    = 0.3
+
+    anti_entropy_lower   = 5  # divided by 100
+    anti_entropy_upper   = 10
