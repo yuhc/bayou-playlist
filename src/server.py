@@ -96,13 +96,17 @@ class Server:
                                                "Creation_Ack", self.accept_time)
                         self.first_creation = False
                         self.nt.send_to_node(buf.sender_id, m_create_ack)
+                        all_servers = copy.deepcopy(self.server_list)
+                        all_servers.add(buf.sender_id)
                         m_notify_newnode = Message(self.node_id, self.unique_id,
-                                                   "New_Node", buf.sender_id)
+                                                   "New_Node", all_servers)
                         for i in self.server_list:
                             self.nt.send_to_node(i, m_notify_newnode)
 
                 elif buf.mtype == "New_Node":
-                    self.server_list.add(buf.sender_id)
+                    print(self.node_id, "gets new server node", buf.content, "from", buf.sender_id)
+                    for i in buf.content:
+                        self.server_list.add(i)
 
                 elif buf.mtype == "Creation_Ack":
                     # buf.content contains sender's accept_time
