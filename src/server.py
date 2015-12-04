@@ -24,6 +24,7 @@ class Server:
         self.is_primary = is_primary    # first created server is the primary
         self.is_retired = False
         self.is_paused  = False
+        self.first_creation = False
 
         self.version_vector = {} # unique_id: accept_time
         if is_primary:
@@ -85,6 +86,7 @@ class Server:
                         except:
                             print(self.uid, "error: unable to start new thread")
                     else:
+                        self.first_creation = True
                         self.receive_server_writes(buf.content)
                         # self.tentative_log.append(buf.content)
                         # self.server_list.add(buf.content.sender_id)
@@ -92,7 +94,15 @@ class Server:
                         #                      self.client_list))
                         m_create_ack = Message(self.node_id, self.unique_id,
                                                "Creation_Ack", self.accept_time)
+                        self.first_creation = False
                         self.nt.send_to_node(buf.sender_id, m_create_ack)
+                        m_notify_newnode = Message(self.node_id, self.unique_id,
+                                                   "New_Node", buf.sender_id)
+                        for i in self.server_list:
+                            self.nt.send_to_node(i, m_notify_newnode)
+
+                elif buf.mtype == "New_Node":
+                    self.server_list.add(buf.sender_id)
 
                 elif buf.mtype == "Creation_Ack":
                     # buf.content contains sender's accept_time
@@ -417,6 +427,8 @@ class Server:
         # rewrite Creation's wid
         if w.mtype == "Creation":
             w.wid = (w.accept_time, w.sender_uid)
+            if self.first_creation:
+                w.sender_uid = (self.accept_time, self.unique_id)
 
         if w.state == "COMMITTED":
             insert_point = len(self.committed_log)
