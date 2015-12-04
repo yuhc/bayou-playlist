@@ -7,7 +7,8 @@ from threading import Thread, Lock, Condition
 from message   import AntiEntropy, Write, Message
 from config    import Config
 
-TERM_LOG = Config.server_log
+TERM_LOG   = Config.server_log
+DETAIL_LOG = Config.server_detail_log
 
 class Server:
 
@@ -24,7 +25,7 @@ class Server:
         self.is_primary = is_primary    # first created server is the primary
         self.is_retired = False
         self.is_paused  = False
-        self.first_creation = False
+        self.first_creation = True      # whether it is the first Creation
 
         self.version_vector = {} # unique_id: accept_time
         if is_primary:
@@ -59,7 +60,8 @@ class Server:
             w_create = Write(self.node_id, self.unique_id, "Creation", None,
                              self.accept_time, self.unique_id)
             self.bayou_write(w_create)
-            threading.Timer(random.uniform(0.3, 0.7),
+        # always call this thread, but non-primary will do nothing
+        threading.Timer(random.uniform(0.3, 0.7),
                         self.timer_primary_commit).start()
 
         # start Anti-Entropy
@@ -86,27 +88,19 @@ class Server:
                         except:
                             print(self.uid, "error: unable to start new thread")
                     else:
-                        self.first_creation = True
-                        self.receive_server_writes(buf.content)
-                        # self.tentative_log.append(buf.content)
-                        # self.server_list.add(buf.content.sender_id)
-                        # self.history.append((self.playlist, self.server_list,
-                        #                      self.client_list))
-                        m_create_ack = Message(self.node_id, self.unique_id,
-                                               "Creation_Ack", self.accept_time)
-                        self.first_creation = False
-                        self.nt.send_to_node(buf.sender_id, m_create_ack)
-                        all_servers = copy.deepcopy(self.server_list)
-                        all_servers.add(buf.sender_id)
-                        m_notify_newnode = Message(self.node_id, self.unique_id,
-                                                   "New_Node", all_servers)
-                        for i in self.server_list:
-                            self.nt.send_to_node(i, m_notify_newnode)
+                        w = buf.content
+                        if w.content: # first creation
+                            # rewrite Creation's wid
+                            w.wid = (w.accept_time, w.sender_uid)
+                            w.sender_uid = (self.accept_time, self.unique_id)
 
-                elif buf.mtype == "New_Node":
-                    print(self.node_id, "gets new server node", buf.content, "from", buf.sender_id)
-                    for i in buf.content:
-                        self.server_list.add(i)
+                        self.receive_server_writes(w)
+
+                        m_create_ack = Message(self.node_id, self.unique_id,
+                                                   "Creation_Ack", self.accept_time)
+                        if not w.content:
+                            m_create_ack.content = None
+                        self.nt.send_to_node(buf.sender_id, m_create_ack)
 
                 elif buf.mtype == "Creation_Ack":
                     # buf.content contains sender's accept_time
@@ -115,7 +109,7 @@ class Server:
                     self.c_create.acquire()
                     if TERM_LOG:
                         print(self.uid, "acquires a c_create lock in receive.Creation_Ack")
-                    if not self.unique_id in self.version_vector:
+                    if not self.unique_id in self.version_vector and buf.content:
                         self.unique_id   = (buf.content, buf.sender_uid)
                         self.accept_time = buf.content + 1
                         self.version_vector[self.unique_id] = self.accept_time
@@ -249,8 +243,9 @@ class Server:
     '''
     Notify server @dest_id about its joining. '''
     def notify(self, dest_id):
-        w_write = Write(self.node_id, self.unique_id, "Creation", 0, 1, None)
+        w_write = Write(self.node_id, self.unique_id, "Creation", None, 1, self.first_creation)
         m_join_server = Message(self.node_id, None, "Creation", w_write)
+        self.first_creation = False # a creation has been sent
         self.nt.send_to_node(dest_id, m_join_server)
 
         self.c_create.acquire()
@@ -268,7 +263,7 @@ class Server:
     '''
     Process Anti-Entropy periodically. '''
     def timer_anti_entropy(self):
-        if TERM_LOG:
+        if TERM_LOG and DETAIL_LOG:
             print(self.uid, "current lists: server_list", self.server_list, "block_list", self.block_list)
         available_list = copy.deepcopy(self.server_list)
         for s in self.server_list:
@@ -347,8 +342,8 @@ class Server:
             if TERM_LOG:
                 print(self.uid, "releases a c_antientropy lock in timer_primary_commit")
 
-            threading.Timer(random.uniform(0.3, 0.7),
-                        self.timer_primary_commit).start()
+        threading.Timer(random.uniform(0.3, 0.7),
+                    self.timer_primary_commit).start()
 
     '''
     Process a received message of type of AntiEntropy. Stated in the paper
@@ -372,7 +367,7 @@ class Server:
             return False
 
         if TERM_LOG:
-            print(self.uid, " starts anti-entropy to Server#", receiver_id, sep="")
+            print(self.uid, " starts anti-entropy to Server#", receiver_id, "current log", self.committed_log, self.tentative_log, sep="")
 
         m_anti_entropy = self.m_anti_entropy
 
@@ -428,12 +423,6 @@ class Server:
         self.bayou_write(w)
 
     def receive_server_writes(self, w):
-        # rewrite Creation's wid
-        if w.mtype == "Creation":
-            w.wid = (w.accept_time, w.sender_uid)
-            if self.first_creation:
-                w.sender_uid = (self.accept_time, self.unique_id)
-
         if w.state == "COMMITTED":
             insert_point = len(self.committed_log)
             for i in range(len(self.committed_log)):

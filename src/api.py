@@ -15,7 +15,7 @@ CMD_DEBUG = Config.master_cmd
 class API:
 
     START_SERVER_TIME = 0.3
-    STABILIZE_TIME    = 8
+    STABILIZE_TIME    = 5
 
     def __init__(self):
         self.nodes    = [] # list of nodes
@@ -93,7 +93,6 @@ class API:
                 if index != server_id:
                     m_create = Message(-1, None, "Creation", index)
                     self.nt.send_to_node(server_id, m_create)
-                    break
 
 
     def retireServer(self, server_id):
