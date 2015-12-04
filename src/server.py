@@ -66,7 +66,8 @@ class Server:
                         self.timer_primary_commit).start()
 
         # start Anti-Entropy
-        threading.Timer(random.randint(4, 10)/10, self.timer_anti_entropy).start()
+        threading.Timer(random.randint(4, 10)/10,
+                        self.timer_anti_entropy).start()
 
 
     def receive(self):
@@ -98,7 +99,7 @@ class Server:
                         self.receive_server_writes(w)
 
                         m_create_ack = Message(self.node_id, self.unique_id,
-                                                   "Creation_Ack", self.accept_time)
+                                               "Creation_Ack", self.accept_time)
                         if not w.content:
                             m_create_ack.content = None
                         self.nt.send_to_node(buf.sender_id, m_create_ack)
@@ -133,10 +134,14 @@ class Server:
                 elif buf.mtype == "RequestAntiEn":
                     # unknown server or itself retires
                     # comment "not buf.sender_id in self.server_list or"
-                    if buf.sender_id in self.block_list or self.is_retired or self.is_paused:
+                    if buf.sender_id in self.block_list or self.is_retired or \
+                       self.is_paused:
                         m_reject_anti = Message(self.node_id, self.unique_id,
                                                 "AntiEn_Reject", None)
                         self.nt.send_to_node(buf.sender_id, m_reject_anti)
+                        self.c_antientropy.release()
+                        if LOCK_LOG:
+                            print(self.uid, "releases a c_antientropy lock in receive.RequestAntiEn")
                         continue
 
                     if LOCK_LOG:
@@ -158,22 +163,22 @@ class Server:
                                         self.tentative_log)
                     m_anti_entropy_ack = Message(self.node_id, self.unique_id,
                                                  "AntiEn_Ack", a_ack)
-                    # dest_id may retire
-                    if not \
-                       self.nt.send_to_node(buf.sender_id, m_anti_entropy_ack):
-                       self.c_antientropy.release()
-                       if LOCK_LOG:
-                           print(self.uid, "releases a c_antientropy lock in receive.RequestAntiEn.Retire")
+                    self.nt.send_to_node(buf.sender_id, m_anti_entropy_ack)
 
                 elif buf.mtype == "AntiEn_Reject":
-                    self.m_anti_entropy = Message(None, None, None, "Reject")
-                    try:
-                        self.c_request_antientropy.notify()
-                    except:
-                        pass
-                    self.c_antientropy.release()
                     if LOCK_LOG:
-                        print(self.uid, "releases a c_antientropy lock in receive.AntiEn_Reject")
+                        print(self.uid, "tries to acquire a c_request_antientropy lock in receive.AntiEn_Reject")
+                    self.c_request_antientropy.acquire()
+                    if LOCK_LOG:
+                        print(self.uid, "acquires a c_request_antientropy lock in receive.AntiEn_Reject")
+                    self.m_anti_entropy = Message(None, None, None, "Reject")
+                    self.c_request_antientropy.notify()
+                    self.c_request_antientropy.release()
+                    if LOCK_LOG:
+                        print(self.uid, "releases a c_request_antientropy lock in receive.AntiEn_Reject")
+                    # self.c_antientropy.release()
+                    # if LOCK_LOG:
+                    #     print(self.uid, "releases a c_antientropy lock in receive.AntiEn_Reject")
 
                 elif buf.mtype == "AntiEn_Ack":
                     if LOCK_LOG:
@@ -181,7 +186,7 @@ class Server:
                     self.c_request_antientropy.acquire()
                     if LOCK_LOG:
                         print(self.uid, "acquires a c_request_antientropy lock in receive.AntiEn_Ack")
-                    self.m_anti_entropy = buf.content
+                    self.m_anti_entropy = copy.deepcopy(buf.content)
                     self.c_request_antientropy.notify()
                     self.c_request_antientropy.release()
                     if LOCK_LOG:
@@ -287,7 +292,6 @@ class Server:
         if not available_list or self.is_paused:
             threading.Timer(random.randint(4, 10)/10.0,
                             self.timer_anti_entropy).start()
-            print(self.uid, "no available servers!!!")
             return
 
         if LOCK_LOG:
@@ -302,7 +306,7 @@ class Server:
             rand_dest = random.randint(0, len(available_list)-1)
         self.available_list = copy.deepcopy(available_list)
         self.rand_dest = rand_dest
-        rand_dest = list(available_list)[rand_dest]
+        rand_dest = sorted(list(available_list))[rand_dest]
 
         if TERM_LOG:
             print(self.uid, " selects to anti-entropy with Server#", rand_dest, sep="")
@@ -318,8 +322,9 @@ class Server:
             self.nt.send_to_master(m_retire)
 
         # finish the anti-entropy
-        m_finish = Message(self.node_id, self.unique_id, "AntiEn_Finsh", None)
-        self.nt.send_to_node(rand_dest, m_finish)
+        if succeed_anti:
+            m_finish = Message(self.node_id, self.unique_id, "AntiEn_Finsh", None)
+            self.nt.send_to_node(rand_dest, m_finish)
 
         if self.is_retired and succeed_anti:
             m_retire = Message(self.node_id, None, "Retire", None)
@@ -370,9 +375,10 @@ class Server:
         m_request_anti = Message(self.node_id, self.unique_id, "RequestAntiEn",
                                  None)
         self.m_anti_entropy = None
-        if not self.nt.send_to_node(receiver_id, m_request_anti):
-            return False
         self.c_request_antientropy.acquire()
+        if not self.nt.send_to_node(receiver_id, m_request_anti):
+            self.c_request_antientropy.release()
+            return False
         while True:
             if self.m_anti_entropy:
                 break
