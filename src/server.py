@@ -61,9 +61,6 @@ class Server:
             w_create = Write(self.node_id, self.unique_id, "Creation", None,
                              self.accept_time, self.unique_id)
             self.bayou_write(w_create)
-        # always call this thread, but non-primary will do nothing
-        threading.Timer(random.randint(4, 10)/10,
-                        self.timer_primary_commit).start()
 
         # start Anti-Entropy
         threading.Timer(random.randint(4, 10)/10,
@@ -226,6 +223,10 @@ class Server:
                     if self.is_retired:
                         continue
 
+                    # primary commits immediately
+                    if self.is_primary:
+                        buf.content.state = "COMMITTED"
+
                     if buf.sender_id in self.server_list:
                         if TERM_LOG:
                             print(self.uid, " receives a write from Server#",
@@ -360,32 +361,6 @@ class Server:
             print(self.uid, "releases a c_antientropy lock in timer_anti_entropy")
 
     '''
-    Primary commits periodically. '''
-    def timer_primary_commit(self):
-        if self.is_primary:
-            if LOCK_LOG:
-                print(self.uid, "tries to acquire a c_antientropy lock in timer_primary_commit")
-            self.c_antientropy.acquire()
-            if LOCK_LOG:
-                print(self.uid, "acquires a c_antientropy lock in timer_primary_commit")
-
-            tmp_tentative_log = copy.deepcopy(self.tentative_log)
-            for wx in tmp_tentative_log:
-                wx.state = "COMMITTED"
-                self.receive_server_writes(wx)
-            self.tentative_log = []
-
-            if self.is_retired:
-                self.is_primary = False
-
-            self.c_antientropy.release()
-            if LOCK_LOG:
-                print(self.uid, "releases a c_antientropy lock in timer_primary_commit")
-
-        threading.Timer(random.randint(8, 12)/10.0,
-                    self.timer_primary_commit).start()
-
-    '''
     Process a received message of type of AntiEntropy. Stated in the paper
     Flexible Update Propagation '''
     def anti_entropy(self, receiver_id):
@@ -477,9 +452,6 @@ class Server:
             for i in range(len(self.committed_log)):
                 if self.committed_log[i].wid == w.wid:
                     return
-                # if self.committed_log[i].wid > w.wid:
-                #     insert_point = i
-                #     break
 
             # rollback
             suffix_committed_log = self.committed_log[insert_point:]
