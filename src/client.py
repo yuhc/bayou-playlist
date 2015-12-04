@@ -110,7 +110,7 @@ class Client:
                 elif buf.mtype == "Done":
                     # print("read set: " + str(self.read_set) + "server_accept_time: " + str(buf.content))
                     union_keys = set(self.read_set.keys())\
-                    .union(buf.content.keys())
+                                     .union(buf.content.keys())
                     for i in union_keys:
                         if i in buf.content and i in self.read_set and\
                         self.read_set[i] < buf.content[i]:

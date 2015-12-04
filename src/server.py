@@ -139,15 +139,11 @@ class Server:
                         m_reject_anti = Message(self.node_id, self.unique_id,
                                                 "AntiEn_Reject", None)
                         self.nt.send_to_node(buf.sender_id, m_reject_anti)
-# May be wrong
-                        self.c_antientropy.release()
-                        if LOCK_LOG:
-                            print(self.uid, "releases a c_antientropy lock in receive.RequestAntiEn")
                         continue
 
                     if LOCK_LOG:
                         print(self.uid, "tries to acquire a c_antientropy lock in receive.RequestAntiEn")
-                    lock_result = self.c_antientropy.acquire(False)
+                    lock_result = self.c_antientropy.acquire(blocking=False)
                     if LOCK_LOG:
                         print(self.uid, "acquires a c_antientropy lock in receive.RequestAntiEn")
                     self.server_list.add(buf.sender_id)
@@ -167,19 +163,10 @@ class Server:
                     self.nt.send_to_node(buf.sender_id, m_anti_entropy_ack)
 
                 elif buf.mtype == "AntiEn_Reject":
-                    if LOCK_LOG:
-                        print(self.uid, "tries to acquire a c_request_antientropy lock in receive.AntiEn_Reject")
-                    self.c_request_antientropy.acquire()
-                    if LOCK_LOG:
-                        print(self.uid, "acquires a c_request_antientropy lock in receive.AntiEn_Reject")
-                    self.m_anti_entropy = Message(None, None, None, "Reject")
-                    self.c_request_antientropy.notify()
-                    self.c_request_antientropy.release()
-                    if LOCK_LOG:
-                        print(self.uid, "releases a c_request_antientropy lock in receive.AntiEn_Reject")
-                    # self.c_antientropy.release()
-                    # if LOCK_LOG:
-                    #     print(self.uid, "releases a c_antientropy lock in receive.AntiEn_Reject")
+                    try:
+                        Thread(target=self.handle_antien_reject).start()
+                    except:
+                        print(self.uid, "error: unable to start new thread")
 
                 elif buf.mtype == "AntiEn_Ack":
                     if LOCK_LOG:
@@ -245,23 +232,14 @@ class Server:
                                   buf.sender_id, sep="")
                         self.receive_server_writes(buf.content)
                     else:
-                        if LOCK_LOG:
-                            print(self.uid, "tries to acquire a c_antientropy \
-                                  lock in receive.Write.Client")
                         if TERM_LOG:
                             print(self.uid, " receives a write from Client#",
                                   buf.sender_id, sep="")
-                        self.c_antientropy.acquire()
-                        if LOCK_LOG:
-                            print(self.uid, "acquires a c_antientropy lock in \
-                                  receive.Write.Client")
-                        self.receive_client_writes(buf.content)
-                        self.c_antientropy.release()
-                        if LOCK_LOG:
-                            print(self.uid, "releases a c_antientropy lock in \
-                                  receive.Write.Client")
-                        done = Message(self.node_id, None, "Done", self.version_vector)
-                        self.nt.send_to_node(buf.sender_id, done)
+                        try:
+                            Thread(target=self.handle_client_write,
+                                   args=(buf,)).start()
+                        except:
+                            print(self.uid, "error: unable to start new thread")
 
     '''
     Notify server @dest_id about its joining. '''
@@ -282,6 +260,42 @@ class Server:
         self.c_create.release()
         if LOCK_LOG:
             print(self.uid, "releases a c_create lock in notify")
+
+    '''
+    Create a thread to handle PUT/DELETE from client. '''
+    def handle_client_write(self, buff):
+        buf = copy.deepcopy(buff)
+        if LOCK_LOG:
+            print(self.uid, "tries to acquire a c_antientropy \
+                  lock in receive.Write.Client")
+        self.c_antientropy.acquire()
+        if LOCK_LOG:
+            print(self.uid, "acquires a c_antientropy lock in \
+                  receive.Write.Client")
+        self.receive_client_writes(buf.content)
+        self.c_antientropy.release()
+        if LOCK_LOG:
+            print(self.uid, "releases a c_antientropy lock in \
+                  receive.Write.Client")
+        done = Message(self.node_id, None, "Done", self.version_vector)
+        self.nt.send_to_node(buf.sender_id, done)
+
+    '''
+    Create a thread handle AntiEn_Reject. '''
+    def handle_antien_reject(self):
+        if LOCK_LOG:
+            print(self.uid, "tries to acquire a c_request_antientropy lock in receive.AntiEn_Reject")
+        self.c_request_antientropy.acquire()
+        if LOCK_LOG:
+            print(self.uid, "acquires a c_request_antientropy lock in receive.AntiEn_Reject")
+        self.m_anti_entropy = Message(None, None, None, "Reject")
+        self.c_request_antientropy.notify()
+        self.c_request_antientropy.release()
+        if LOCK_LOG:
+            print(self.uid, "releases a c_request_antientropy lock in receive.AntiEn_Reject")
+        # self.c_antientropy.release()
+        # if LOCK_LOG:
+        #     print(self.uid, "releases a c_antientropy lock in receive.AntiEn_Reject")
 
     '''
     Process Anti-Entropy periodically. '''
@@ -380,7 +394,13 @@ class Server:
         m_request_anti = Message(self.node_id, self.unique_id, "RequestAntiEn",
                                  None)
         self.m_anti_entropy = None
+
+        if LOCK_LOG:
+            print(self.uid, "tries to acquire a c_request_antientropy lock in anti_entropy")
         self.c_request_antientropy.acquire()
+        if LOCK_LOG:
+            print(self.uid, "acquires a c_request_antientropy lock in anti_entropy")
+
         if not self.nt.send_to_node(receiver_id, m_request_anti):
             self.c_request_antientropy.release()
             return False
@@ -437,6 +457,8 @@ class Server:
                 self.nt.send_to_node(receiver_id, m_write)
 
         self.c_request_antientropy.release()
+        if LOCK_LOG:
+            print(self.uid, "releases a c_request_antientropy lock in anti_entropy")
         return True
 
     '''
