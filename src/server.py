@@ -139,6 +139,7 @@ class Server:
                         m_reject_anti = Message(self.node_id, self.unique_id,
                                                 "AntiEn_Reject", None)
                         self.nt.send_to_node(buf.sender_id, m_reject_anti)
+# May be wrong
                         self.c_antientropy.release()
                         if LOCK_LOG:
                             print(self.uid, "releases a c_antientropy lock in receive.RequestAntiEn")
@@ -245,16 +246,20 @@ class Server:
                         self.receive_server_writes(buf.content)
                     else:
                         if LOCK_LOG:
-                            print(self.uid, "tries to acquire a c_antientropy lock in receive.Write.Client")
-                        self.c_antientropy.acquire()
-                        if LOCK_LOG:
-                            print(self.uid, "acquires a c_antientropy lock in receive.Write.Client")
+                            print(self.uid, "tries to acquire a c_antientropy \
+                                  lock in receive.Write.Client")
+                        if TERM_LOG:
                             print(self.uid, " receives a write from Client#",
                                   buf.sender_id, sep="")
+                        self.c_antientropy.acquire()
+                        if LOCK_LOG:
+                            print(self.uid, "acquires a c_antientropy lock in \
+                                  receive.Write.Client")
                         self.receive_client_writes(buf.content)
                         self.c_antientropy.release()
                         if LOCK_LOG:
-                            print(self.uid, "releases a c_antientropy lock in receive.Write.Client")
+                            print(self.uid, "releases a c_antientropy lock in \
+                                  receive.Write.Client")
                         done = Message(self.node_id, None, "Done", self.version_vector)
                         self.nt.send_to_node(buf.sender_id, done)
 
