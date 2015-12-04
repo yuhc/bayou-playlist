@@ -46,7 +46,7 @@ class Server:
         self.client_list    = set() # modified by master
         self.block_list     = set() # list of blocked connections
         self.available_list = set() # last available
-        self.rand_dest      = -1    # last anti-entropy partner id
+        self.sent_list      = set() # has sent to theses servers
         self.nt = Network(self.uid)
         try:
             self.t_recv = Thread(target=self.receive)
@@ -142,7 +142,7 @@ class Server:
                         print(self.uid, "tries to acquire a c_antientropy lock in receive.RequestAntiEn")
                     lock_result = self.c_antientropy.acquire(blocking=False)
                     if LOCK_LOG:
-                        print(self.uid, "acquires a c_antientropy lock in receive.RequestAntiEn")
+                        print(self.uid, "acquires a c_antientropy lock in receive.RequestAntiEn:", lock_result)
                     self.server_list.add(buf.sender_id)
 
                     # if currently anti-entropy, then reject
@@ -303,14 +303,12 @@ class Server:
     def timer_anti_entropy(self):
         if TERM_LOG and DETAIL_LOG:
             print(self.uid, "current lists: server_list", self.server_list, "block_list", self.block_list)
-        available_list = copy.deepcopy(self.server_list)
-        for s in self.server_list:
-            if s in self.block_list:
-                available_list.remove(s)
-        if self.node_id in available_list:
-            available_list.remove(self.node_id)
-        if not available_list or self.is_paused:
-            threading.Timer(random.randint(4, 10)/10.0,
+        self.available_list = self.available_list.union(self.server_list)
+        self.available_list = self.available_list.difference(self.block_list)
+        if self.node_id in self.available_list:
+            self.available_list.remove(self.node_id)
+        if not self.available_list or self.is_paused:
+            threading.Timer(random.randint(5, 10)/100.0,
                             self.timer_anti_entropy).start()
             return
 
@@ -320,13 +318,7 @@ class Server:
         if LOCK_LOG:
             print(self.uid, "acquires a c_antientropy lock in timer_anti_entropy")
 
-        if available_list == self.available_list: # available_list unchanged
-            rand_dest = (self.rand_dest + 1) % len(available_list)
-        else:
-            rand_dest = random.randint(0, len(available_list)-1)
-        self.available_list = copy.deepcopy(available_list)
-        self.rand_dest = rand_dest
-        rand_dest = sorted(list(available_list))[rand_dest]
+        rand_dest = list(self.available_list)[0]
 
         if TERM_LOG:
             print(self.uid, " selects to anti-entropy with Server#", rand_dest, sep="")
@@ -343,6 +335,8 @@ class Server:
 
         # finish the anti-entropy
         if succeed_anti:
+            self.available_list.remove(rand_dest)
+            self.sent_list.add(rand_dest)
             m_finish = Message(self.node_id, self.unique_id, "AntiEn_Finsh", None)
             self.nt.send_to_node(rand_dest, m_finish)
 
@@ -354,7 +348,7 @@ class Server:
             os.kill(os.getpid(), signal.SIGKILL)
 
 
-        threading.Timer(random.randint(4, 10)/10.0, self.timer_anti_entropy).start()
+        threading.Timer(random.randint(5, 10)/100.0, self.timer_anti_entropy).start()
 
         self.c_antientropy.release()
         if LOCK_LOG:
@@ -382,10 +376,15 @@ class Server:
         while True:
             if self.m_anti_entropy:
                 break
+            if LOCK_LOG:
+                print(self.uid, "is waiting for c_request_antientropy in anti_entropy")
             self.c_request_antientropy.wait()
         if isinstance(self.m_anti_entropy, Message): # was rejected
             if TERM_LOG and DETAIL_LOG:
                 print(self.uid, " was rejected anti-entropy by Server#", receiver_id, sep="")
+            self.c_request_antientropy.release()
+            if LOCK_LOG:
+                print(self.uid, "releases a c_request_antientropy lock in anti_entropy")
             return False
 
         if TERM_LOG and DETAIL_LOG:
@@ -445,6 +444,10 @@ class Server:
         w.accept_time    = self.accept_time
         w.wid            = (self.accept_time, self.unique_id)
         self.bayou_write(w)
+
+        # update available_list
+        self.available_list = self.available_list.union(self.sent_list)
+        self.sent_list      = set()
 
     def receive_server_writes(self, w):
         if w.state == "COMMITTED":
@@ -521,6 +524,10 @@ class Server:
                 self.bayou_write(wx)
             if TERM_LOG:
                 print(self.uid, "<FINAL TENTATIVE>", "commit", self.committed_log, "tentative", self.tentative_log)
+
+        # update available_list
+        self.available_list = self.available_list.union(self.sent_list)
+        self.sent_list      = set()
 
     '''
     Bayou_Write in paper Bayou. '''
