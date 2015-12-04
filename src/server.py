@@ -443,6 +443,7 @@ class Server:
                                    "Write", w)
                 self.nt.send_to_node(receiver_id, m_commit)
         # tentative log
+        print(self.uid, self.unique_id, "antientropy with", receiver_id, "R_version_vector", R_version_vector, "++++++++", self.tentative_log)
         for w in self.tentative_log:
             if not w.sender_uid in R_version_vector or \
                R_version_vector[w.sender_uid] < w.accept_time:
