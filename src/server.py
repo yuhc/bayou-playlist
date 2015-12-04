@@ -80,7 +80,6 @@ class Server:
                 if isinstance(buf.content, Write):
                     self.accept_time = max(self.accept_time,
                                            buf.content.accept_time) + 1
-                    self.version_vector[self.unique_id] = self.accept_time
 
                 if buf.mtype == "Creation":
                     if buf.sender_id < 0:
@@ -113,7 +112,6 @@ class Server:
                     if not self.unique_id in self.version_vector and buf.content:
                         self.unique_id   = (buf.content, buf.sender_uid)
                         self.accept_time = buf.content + 1
-                        self.version_vector[self.unique_id] = self.accept_time
                     self.c_create.notify()
                     self.c_create.release()
                     if LOCK_LOG:
@@ -122,7 +120,6 @@ class Server:
                 elif buf.mtype == "Retire":
                     self.is_retired = True
                     self.accept_time = self.accept_time + 1
-                    self.version_vector[self.unique_id] = self.accept_time
                     w_retire = Write(self.node_id, self.unique_id,
                                      "Retirement", None,
                                      self.accept_time, self.unique_id)
@@ -449,17 +446,6 @@ class Server:
                 m_write = Message(self.node_id, self.unique_id, "Write", w)
                 self.nt.send_to_node(receiver_id, m_write)
 
-        # update version_vector
-        for v in R_version_vector:
-            if not v in self.version_vector:
-                self.version_vector[v] = R_version_vector[v]
-        for v in S_version_vector:
-            try:
-                self.version_vector[v] = max(self.version_vector[v],
-                                             R_version_vector[v])
-            except:
-                pass
-
         self.c_request_antientropy.release()
         if LOCK_LOG:
             print(self.uid, "releases a c_request_antientropy lock in anti_entropy")
@@ -582,6 +568,13 @@ class Server:
         else:
             self.tentative_log.append(w)
         self.history.append(self.playlist)
+
+        # update version_vector
+        if not w.sender_uid in self.version_vector:
+            self.version_vector[w.sender_uid] = w.accept_time
+        else:
+            self.version_vector[w.sender_uid] = \
+                max(self.version_vector[w.sender_uid], w.accept_time)
 
     '''
     Print playlist and send it to master. '''
