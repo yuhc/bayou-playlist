@@ -301,7 +301,7 @@ class Server:
                 done = Message(self.node_id, None, "Done", self.version_vector)
                 self.nt.send_to_node(buf.sender_id, done)
                 return
-        
+
         if LOCK_LOG:
             print(self.uid, "tries to acquire a c_antientropy",
                   "lock in receive.Write.Client")
@@ -370,9 +370,10 @@ class Server:
 
         # select a new primary
         if self.is_retired and succeed_anti:
-            m_elect = Message(self.node_id, self.unique_id, "Elect",
-                              None)
-            self.nt.send_to_node(rand_dest, m_elect)
+            if self.is_primary:
+                m_elect = Message(self.node_id, self.unique_id, "Elect",
+                                  None)
+                self.nt.send_to_node(rand_dest, m_elect)
             m_retire = Message(self.node_id, self.unique_id,
                                "RetireAck", None)
             self.nt.send_to_master(m_retire)
@@ -503,7 +504,7 @@ class Server:
         w.accept_time    = self.accept_time
         w.wid            = (self.accept_time, self.unique_id)
         w.content        = w.content[0]
-        self.bayou_write(w)
+        self.receive_server_writes(w)
 
         # update available_list
         self.available_list = self.available_list.union(self.sent_list)
