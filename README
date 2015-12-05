@@ -80,22 +80,17 @@ The functions of server are mainly based on [1] and [3].
 
 Client
 ------------------------------------------------------------------------------
-The client sends messages to all replicas (numbered from `0`..`f`) in the
-system. It stores the messages in a buffer, and remove the message from the
-buffer when receiving `decision` of it. When the buffer is empty, the client
-tells the master that the blocking of `allClear` can be cleared. When a client
-hears that the election of new leader is completed, it will resend the messages
-in the buffer.
-
-According to the implementation, when client does not clear its message buffer
-after long enough time, the system is stable (not changed meaningfully by the
-time). Then client will return `allClear` to master directly, and move the
-progress on.
-
-In order to deal with the case where a sendMessage is executed when all
-replicas fails, the client will notify the leader to reset the state
-periodically when it is dealing with `allClear` from master. This operation
-is aimed to reset the whole Paxos system.
+The client sends message to server when master gives a get/put/delete command.
+It keeps a version vector to indicate the write it has seen. When a write or
+read success, the message will carry the server's version vector and client
+will update its version vector. During write (for both put and delete), client
+will send its version vector to the server. If the client's version vector
+is more recent than the server's version vector, then the server will not
+perform the write which satisfies the write session guarantee. For read, the
+client will get the server's version vector and the client will compare its
+version vector with the server's version vector. If the server's version
+vector does not dominant the client's version vector, the client will output
+ERR_DEP for the song url and this helps to implement the read sessoin guarantee. 
 
 
 Some Techniques
