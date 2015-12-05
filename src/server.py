@@ -23,7 +23,7 @@ class Server:
     def __init__(self, node_id, is_primary):
         self.node_id    = node_id
         self.uid        = "Server#" + str(node_id)
-        self.unique_id  = (1, node_id)  # replica_id in lecture note, <clock, id>
+        self.unique_id  = (1, node_id)  # replica_id in lecture note, <clock,id>
 
         self.is_primary = is_primary    # first created server is the primary
         self.is_retired = False
@@ -85,7 +85,8 @@ class Server:
                 if buf.mtype == "Creation":
                     if buf.sender_id < 0:
                         try:
-                            Thread(target=self.notify,args=(buf.content,)).start()
+                            Thread(target=self.notify,args=(buf.content,)
+                            ).start()
                         except:
                             print(self.uid, "error: unable to start new thread")
                     else:
@@ -112,7 +113,8 @@ class Server:
                     if LOCK_LOG:
                         print(self.uid, "acquires a c_create lock in",
                               "receive.Creation_Ack")
-                    if not self.unique_id in self.version_vector and buf.content:
+                    if not self.unique_id in self.version_vector and \
+                       buf.content:
                         self.unique_id   = (buf.content, buf.sender_uid)
                         self.accept_time = buf.content + 1
                     self.c_create.notify()
@@ -397,7 +399,8 @@ class Server:
 
         self.c_antientropy.release()
         if LOCK_LOG:
-            print(self.uid, "releases a c_antientropy lock in timer_anti_entropy")
+            print(self.uid, "releases a c_antientropy lock in",
+                  "timer_anti_entropy")
 
     '''
     Process a received message of type of AntiEntropy. Stated in the paper
@@ -411,10 +414,12 @@ class Server:
         self.m_anti_entropy = None
 
         if LOCK_LOG:
-            print(self.uid, "tries to acquire a c_request_antientropy lock in anti_entropy")
+            print(self.uid, "tries to acquire a c_request_antientropy lock in",
+                  "anti_entropy")
         self.c_request_antientropy.acquire()
         if LOCK_LOG:
-            print(self.uid, "acquires a c_request_antientropy lock in anti_entropy")
+            print(self.uid, "acquires a c_request_antientropy lock in",
+                  "anti_entropy")
 
         if not self.nt.send_to_node(receiver_id, m_request_anti):
             self.c_request_antientropy.release()
@@ -427,18 +432,23 @@ class Server:
             if self.m_anti_entropy:
                 break
             if LOCK_LOG:
-                print(self.uid, "is waiting for c_request_antientropy in anti_entropy")
+                print(self.uid, "is waiting for c_request_antientropy in",
+                      "anti_entropy")
             self.c_request_antientropy.wait()
         if isinstance(self.m_anti_entropy, Message): # was rejected
             if TERM_LOG and DETAIL_LOG:
-                print(self.uid, " was rejected anti-entropy by Server#", receiver_id, sep="")
+                print(self.uid, " was rejected anti-entropy by Server#",
+                      receiver_id, sep="")
             self.c_request_antientropy.release()
             if LOCK_LOG:
-                print(self.uid, "releases a c_request_antientropy lock in anti_entropy")
+                print(self.uid, "releases a c_request_antientropy lock in",
+                      "anti_entropy")
             return False
 
         if TERM_LOG and DETAIL_LOG:
-            print(self.uid, " starts anti-entropy to Server#", receiver_id, " >>> current log: ", self.committed_log, " ~~~ ", self.tentative_log, sep="")
+            print(self.uid, " starts anti-entropy to Server#", receiver_id,
+                  " >>> committed log: ", self.committed_log,
+                  " >>> tentative log: ", self.tentative_log, sep="")
 
         m_anti_entropy = self.m_anti_entropy
 
@@ -477,7 +487,8 @@ class Server:
 
         self.c_request_antientropy.release()
         if LOCK_LOG:
-            print(self.uid, "releases a c_request_antientropy lock in anti_entropy")
+            print(self.uid, "releases a c_request_antientropy lock in",
+                  "anti_entropy")
         return True
 
     '''
@@ -645,12 +656,14 @@ class Server:
             if wx.mtype == "Put" or wx.mtype == "Delete":
                 contents = wx.content.split(' ')
             if wx.mtype == "Put":
-                plog = plog + "PUT:(" + contents[0] + ", " + contents[1] + "):TRUE\n"
+                plog = plog + "PUT:(" + contents[0] + ", " + contents[1] + \
+                       "):TRUE\n"
             elif wx.mtype == "Delete":
                 plog = plog + "DELETE:(" + contents[0] + "):TRUE\n"
         for wx in self.tentative_log:
             if wx.mtype == "Put":
-                plog = plog + "PUT:(" + contents[0] + ", " + contents[1] + "):FALSE\n"
+                plog = plog + "PUT:(" + contents[0] + ", " + contents[1] + \
+                       "):FALSE\n"
             elif wx.mtype == "Delete":
                 plog = plog + "DELETE:(" + contents[0] + "):FALSE\n"
 

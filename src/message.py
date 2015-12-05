@@ -57,7 +57,8 @@ class Write:
     '''
     A Write is created when a server receives any message from a client.
     @mtype is either Creation, Retirement, Put or Delete. '''
-    def __init__(self, sender, sender_uid, mtype, CSN, accept_time, content, state="TENTATIVE", wid=None):
+    def __init__(self, sender, sender_uid, mtype, CSN, accept_time, content,
+                 state="TENTATIVE", wid=None):
         self.sender_id   = sender
         self.sender_uid  = sender_uid  # unique_id
         self.mtype       = mtype
@@ -83,9 +84,11 @@ class Write:
     Message format:
         (Write, sender_id, message_type, CSN, accept_time, message_content) '''
     def __str__(self):
-        return str(("Write", self.sender_id, self.sender_uid, self.mtype, self.CSN,
-                    self.accept_time, self.content, self.state, self.wid))
+        return str(("Write", self.sender_id, self.sender_uid, self.mtype,
+                    self.CSN, self.accept_time, self.content, self.state,
+                    self.wid))
 
     def __repr__(self):
-        return str(("Write", self.sender_id, self.sender_uid, self.mtype, self.CSN,
-                    self.accept_time, self.content, self.state, self.wid))
+        return str(("Write", self.sender_id, self.sender_uid, self.mtype,
+                    self.CSN, self.accept_time, self.content, self.state,
+                    self.wid))

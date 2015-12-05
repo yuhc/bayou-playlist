@@ -87,7 +87,8 @@ class Network:
                         (sender_id, sender_uid, mtype, csn, accept_time,
                          content, state, wid) = content[1:]
                         message.content = Write(sender_id, sender_uid, mtype,
-                                                csn, accept_time, content, state, wid)
+                                                csn, accept_time, content,
+                                                state, wid)
             else:
                 if TERM_LOG:
                     print(self.uid, "receives unrecognized message:",
