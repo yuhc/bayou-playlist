@@ -106,17 +106,20 @@ class Server:
                 elif buf.mtype == "Creation_Ack":
                     # buf.content contains sender's accept_time
                     if LOCK_LOG:
-                        print(self.uid, "tries to acquire a c_antientropy lock in receive.Creation_Ack")
+                        print(self.uid, "tries to acquire a c_antientropy lock",
+                                        "in receive.Creation_Ack")
                     self.c_create.acquire()
                     if LOCK_LOG:
-                        print(self.uid, "acquires a c_create lock in receive.Creation_Ack")
+                        print(self.uid, "acquires a c_create lock in",
+                              "receive.Creation_Ack")
                     if not self.unique_id in self.version_vector and buf.content:
                         self.unique_id   = (buf.content, buf.sender_uid)
                         self.accept_time = buf.content + 1
                     self.c_create.notify()
                     self.c_create.release()
                     if LOCK_LOG:
-                        print(self.uid, "releases a c_create lock in receive.Creation_Ack")
+                        print(self.uid, "releases a c_create lock in",
+                              "receive.Creation_Ack")
 
                 elif buf.mtype == "Retire":
                     self.is_retired = True
@@ -139,10 +142,12 @@ class Server:
                         continue
 
                     if LOCK_LOG:
-                        print(self.uid, "tries to acquire a c_antientropy lock in receive.RequestAntiEn")
+                        print(self.uid, "tries to acquire a c_antientropy lock",
+                              "in receive.RequestAntiEn")
                     lock_result = self.c_antientropy.acquire(blocking=False)
                     if LOCK_LOG:
-                        print(self.uid, "acquires a c_antientropy lock in receive.RequestAntiEn:", lock_result)
+                        print(self.uid, "acquires a c_antientropy lock in",
+                              "receive.RequestAntiEn:", lock_result)
                     self.server_list.add(buf.sender_id)
 
                     # if currently anti-entropy, then reject
@@ -365,8 +370,6 @@ class Server:
             self.nt.send_to_node(rand_dest, m_finish)
 
         if self.is_retired and succeed_anti:
-            m_retire = Message(self.node_id, None, "Retire", None)
-            self.nt.send_to_master(m_retire)
             if TERM_LOG:
                 print(self.uid, "kills itself")
             os.kill(os.getpid(), signal.SIGKILL)
@@ -532,7 +535,8 @@ class Server:
             if (len(self.committed_log) > len_committed_log):
                 new_write = True
             if TERM_LOG:
-                print(self.uid, "<FINAL COMMIT>", "commit", self.committed_log, "tentative", self.tentative_log)
+                print(self.uid, "<FINAL COMMIT>", "commit", self.committed_log,
+                      "tentative", self.tentative_log)
 
         else:
             for i in range(len(self.committed_log)):

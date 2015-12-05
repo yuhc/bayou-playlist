@@ -1,5 +1,0 @@
-joinServer 0
-joinClient 1 0
-put 1 hello hello.world
-stabilize
-get 1 hello

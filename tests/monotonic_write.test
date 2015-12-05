@@ -19,4 +19,5 @@ get 2 a
 get 2 b
 get 2 c
 get 2 d
+printLog 0
 printLog 1

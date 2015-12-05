@@ -4,9 +4,7 @@ joinServer 2
 joinClient 3 0
 joinClient 4 1
 joinClient 5 2
-pause
 retireServer 0
-start
 put 5 eyesOfTexas cs.utexas.edu
 stabilize
 get 5 eyesOfTexas
