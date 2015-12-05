@@ -30,7 +30,7 @@ outputs in `./solutions`.
 
 `Python3` is required.
 
-We supply **34** test cases including the original ones. They cover most special
+We supply **35** test cases including the original ones. They cover most special
 cases including the basic operations and the session guarantees.
 
 Some Assumptions
@@ -38,7 +38,8 @@ Some Assumptions
 * The tester should leave enough minutes for each test case. For the given test
 cases, our program runs in less than 5 min (which is the time given by the
 default tester). But it may run longer when given other tests (e.g. creating
-20 servers and executing a `stabilize).
+20 servers and executing a `stabilize). We modified the timer to 50 min in order
+to finish the test of 35 test cases.
 
 * No crashes in the system.
 
@@ -80,7 +81,7 @@ The functions of server are mainly based on [1] and [3].
 
 Client
 ------------------------------------------------------------------------------
-The client sends message to server when master gives a get/put/delete command.
+The client sends message to server when master gives a GET/PUT/DELETE command.
 It keeps a version vector to indicate the write it has seen. When a write or
 read success, the message will carry the server's version vector and client
 will update its version vector. During write (for both put and delete), client
@@ -90,7 +91,7 @@ perform the write which satisfies the write session guarantee. For read, the
 client will get the server's version vector and the client will compare its
 version vector with the server's version vector. If the server's version
 vector does not dominant the client's version vector, the client will output
-ERR_DEP for the song url and this helps to implement the read sessoin guarantee. 
+ERR_DEP for the song url and this helps to implement the read sessoin guarantee.
 
 
 Some Techniques
@@ -99,7 +100,12 @@ Some Techniques
 Message Formats
 ------------------------------------------------------------------------------
 The messages are stored as objects. They are defined in `./src/message.py`.
-There are three kinds of messages,
+There are three kinds of messages, normal `Message`, Anti-Entropy information
+`AntiEntropy` and the writes `Write`. The network handler only sends and
+receives `Message`. The `AntiEntropy` and `Write` are contained in the
+`Message.content`. The messages and writes are specified with their unique ids.
+Writes are also assigned with their states, write id, and accepted time. This
+contents are used for reducing the unnecessary messages during Anti-Entropy [3].
 
 Trigger Anti-Entropy
 ------------------------------------------------------------------------------
@@ -113,46 +119,7 @@ The Anti-Entropy can either be accepted or be rejected by the destination. This
 is to guarantee that the database will not be modified by several instances.
 The destination will try the lock to determine whether it accepts the request.
 
-
-
-Failure Detection
+Primary Election
 ------------------------------------------------------------------------------
-The only leader in the system keeps broadcasting heartbeat to other servers.
-Each server creates a thread to detect the heartbeat. When a server does not
-receive heartbeat in a fixed period (timeout), this server regards the leader
-crashed, and starts a leader election protocol.
 
-Leader Election
-------------------------------------------------------------------------------
-We made a bit modification of the leader election in Three-Phase-Commit project.
-When a leader election starts, the server marks `leader_is_dead` as `True`,
-regards itself as the new leader, and broadcast a heartbeat containing its
-`node_id`. If a server receives a heartbeat from others, it updates its
-`leader_id` to the `node_id` in the heartbeat when `node_id` smaller than its
-own id or `leader_is_dead` is `True`. Then it marks `leader_is_dead` as `False`.
-
-After three rounds (actually two are enough), all servers have the same
-`leader_id`, which is the smallest index of them. Then this new leader sends a
-acknowledge message to all Clients. The Clients then resend the
-messages in their waiting queues.
-
-
-Using Auto Grader
-==============================================================================
-Run "python tester.py" and check your output.
-
-To add your own tests, create a .test file and a .sol file in the tests/ and solutions/ directories respectively.
-You can check what your output was in the answers/ directory.
-
-Running tests manually:
-
-To run the sample tests, replace test_name with the name of the test and execute the following command:
-
-cat tests/[test_name].test | $(cat COMMAND)
-
-To automatically check the output:
-
-cat tests/[test_name].test | $(cat COMMAND) > temp_output && diff -q temp_output tests/[test_name].sol
-
-If your output matches the solution, NOTHING will be printed. Otherwise the lines that differ will be shown.
-The output for the run of the test will also be stored in a file temp_output after running the second command.
+When a primary is
