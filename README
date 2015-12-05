@@ -1,8 +1,8 @@
 # Bayou
 
 This is a Bayou implementation based on D. Terry's Managing Update Conflicts
-in Bayou, and Session Guarantees for Weakly Consistent Replicated Data, and
-K. Petersen's Flexible Update Propagation.
+in Bayou [1], and Session Guarantees for Weakly Consistent Replicated Data [2],
+and K. Petersen's Flexible Update Propagation [3].
 
 Now the README is copied directly from Paxos project. It will be updated later.
 
@@ -30,60 +30,29 @@ outputs in `./solutions`.
 
 `Python3` is required.
 
-We supply **34** test cases including the original ones. Two of them are non-
-deterministic. According to the test environment (the normal desktops) we used,
-the others lead to identical outputs.
-
-The two non-deterministic test cases were named with "parallel", e.g.
-`retire_4_parallel.test` and `monotonic_write_parallel.test` are very likely to
-output different results, as they contain several races. But their outputs are
-consistent. Therefore, normally, passing **32** test cases means the code is
-correct with the current tester (it does not support to check consistency).
-
-
-The first PUT (`3, eyesOfTexas utexas.edu`) will be committed by the primary
-(server#0), and all servers will know it after the first `stabilize`. Then the
-primary is isolated. The second PUT adds a song to server#1, which is later
-known by server#0, the third adds a song to server#2
-Usually the leader will bomb after deciding message `how` (in the real world,
-maybe not). Then during the leader election, client \#0 and \#1 race to request
-`hi` and `what`. So the result may be either
-```
-0 0: how
-1 0: hi
-2 1: what
-0 0: how
-1 0: hi
-2 1: what
-```
-
-or
-```
-0 0: how
-1 1: what
-2 0: hi
-0 0: how
-1 1: what
-2 0: hi
-```
-
+We supply **34** test cases including the original ones. They cover most special
+cases including the basic operations and the session guarantees.
 
 Some Assumptions
 ==============================================================================
 * The tester should leave enough minutes for each test case. For the given test
-cases, our program runs in less than 20 seconds. But it may run longer when
-given other tests.
+cases, our program runs in less than 5 min (which is the time given by the
+default tester). But it may run longer when given other tests (e.g. creating
+20 servers and executing a `stabilize).
 
 * No crashes in the system.
 
 * A client will only connect one server at a time.
 
-* You should make sure that the indexes are not out of bound.
+* You should make sure that the indexes are not out of bound (otherwise that
+command will be ignored).
 
 * The channel is valid.
 
+* `retirement` should be passed via Anti-Entropy.
 
-Modification of Paxos
+
+Modification of Bayou
 ==============================================================================
 
 Master
@@ -92,27 +61,22 @@ The master reads the input commands, and send messages to clients or servers
 accordingly. Besides, the master needs to create the processes of servers and
 clients. All the output that tester needs are written by master (to stdout).
 
-As there are some commands requiring blocking, we use asynchronous blocking
-instead of `time.sleep()` to wait for the completion of these commands. At the
-end of the execution of master, it kills all the processes in order to release
-the ports occupied by them.
+As there are some commands requiring blocking, we use either asynchronous
+blocking (conditional locks) or simple `time.sleep()` to wait for the completion
+of these commands. At the end of the execution of master, it kills all the
+processes in order to release the ports occupied by them.
 
-Server (Node)
+Server
 ------------------------------------------------------------------------------
-The code for server lives in node.py. Each server may have multiple roles
-(Acceptor, Replica, Leader, Scout and Commander). For Paxos to work, we need
-to have `2f+1` acceptors and `f+1` replicas. In our implementation, we choose
-to have `2f+1` replicas to better handling the case when f+1 replicas fail.
-Each server calculates `f` and assign the role based on the node id. `0` .. `f`
-are replicas and all servers are acceptors. Initially, master assign server 0
-as the leader and if it fails, server will elect a new leader according to the
-leader election algorithm described below. We encapsulate each role as a
-separate class and create a cooresponding object when a server needs a role to
-perform Paxos operations.
+The code for server lives in server.py. Each server has the attributes of its
+`node_id`, `unique_id`, `accept_time` (of writes), `version_vector` etc. Some
+technical details are stated in the Technique Section.
 
-The created objects include Replica, Leader and Acceptor. If a server is the
-leader, then it also creates some Scouts and Commanders. When the server
-receives a message, it throws the message to cooresponding object.
+The server creates a thread to handle the socket messages. It also creates a
+separate thread to handle each anti-entropy process. We use conditional locks to
+guarantee that the database is being edited only by one process.
+
+The functions of server are mainly based on [1] and [3].
 
 Client
 ------------------------------------------------------------------------------
@@ -139,25 +103,22 @@ Some Techniques
 
 Message Formats
 ------------------------------------------------------------------------------
-The messages are stored as tuples. Typically, a message is in the following
-format (we use the propose from Replicas as example):
-```python
-message = ('propose', (slot_num, proposal))
-```
+The messages are stored as objects. They are defined in `./src/message.py`.
+There are three kinds of messages,
 
-`message[0]` means the type of the message, and `message[1]` contains the
-information. `slot_num` is an integer, and `proposal` is another tuple:
-```python
-proposal = (client_id, command_id, chatlog)
-```
-
-The messages are parsed by `ast.literal_eval()`.
-
-Asynchronous Blocking
+Trigger Anti-Entropy
 ------------------------------------------------------------------------------
-Master and Clients may be blocked due to `restartServer`, `printChatLog` and
-`allClear`. We do not use `time.sleep()` to implement the blocking. Instead,
-the processes wait for others' acknowledges to get out of the blocking.
+The Anti-Entropy process described in [3] is triggered periodically. The period
+is randomly selected at the end of each Anti-Entropy. The server keeps four
+lists: `server_list`, `block_list`, `sent_list` and `available_list`. Each time
+the server will choose one destination from `available_list` to request the
+Anti-Entropy.
+
+The Anti-Entropy can either be accepted or be rejected by the destination. This
+is to guarantee that the database will not be modified by several instances.
+The destination will try the lock to determine whether it accepts the request.
+
+
 
 Failure Detection
 ------------------------------------------------------------------------------
