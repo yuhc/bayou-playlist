@@ -281,6 +281,20 @@ class Server:
     Create a thread to handle PUT/DELETE from client. '''
     def handle_client_write(self, buff):
         buf = copy.deepcopy(buff)
+        client_version_vector = buf.content.content[1]
+        union_keys = set(self.version_vector.keys())\
+                     .union(client_version_vector.keys())
+        for i in union_keys:
+            if not i in self.version_vector:
+                done = Message(self.node_id, None, "Done", self.version_vector)
+                self.nt.send_to_node(buf.sender_id, done)
+                return
+            elif i in client_version_vector and \
+                 client_version_vector[i] > self.version_vector[i]:
+                done = Message(self.node_id, None, "Done", self.version_vector)
+                self.nt.send_to_node(buf.sender_id, done)
+                return
+        
         if LOCK_LOG:
             print(self.uid, "tries to acquire a c_antientropy",
                   "lock in receive.Write.Client")
@@ -581,16 +595,16 @@ class Server:
     Bayou_Write in paper Bayou. '''
     def bayou_write(self, w):
         if w.mtype == "Put":
-            cmd = w.content.split(' ')
+            cmd = w.content[0].split(' ')
             self.playlist[cmd[0]] = cmd[1]
         elif w.mtype == "Delete":
-            cmd = w.content
+            cmd = w.content[0]
             self.playlist.pop(cmd)
         elif w.mtype == "Creation":
             self.server_list.add(w.sender_id)
         elif w.mtype == "Retirement":
             try:
-                self.version_vector.pop(w.content)
+                self.version_vector.pop(w.content[0])
             except:
                 pass
             try:
@@ -620,7 +634,7 @@ class Server:
         for wx in self.committed_log:
             contents = []
             if wx.mtype == "Put" or wx.mtype == "Delete":
-                contents = wx.content.split(' ')
+                contents = wx.content[0].split(' ')
             if wx.mtype == "Put":
                 plog = plog + "PUT:(" + contents[0] + ", " + contents[1] + "):TRUE\n"
             elif wx.mtype == "Delete":

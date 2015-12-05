@@ -17,7 +17,7 @@ class Client:
         self.node_id    = node_id
         self.uid        = "Client#" + str(node_id)
 
-        self.read_set = {} # session guarantees
+        self.version_vector = {} # session guarantees
 
         # create the network controller
         self.connected_server   = None # which server is connected
@@ -40,7 +40,7 @@ class Client:
 
                 if buf.mtype == "Put":
                     w = Write(self.node_id, None, "Put", None, 0,
-                              buf.content)
+                              (buf.content, self.version_vector))
                     m_put = Message(self.node_id, None, "Write", w)
                     c_can_send_to_server.acquire()
                     while True:
@@ -81,42 +81,42 @@ class Client:
                 elif buf.mtype == "GetAck":
                     (song_name, song_url, server_vv) = buf.content
                     get_content = ""
-                    # print("read set: " + str(self.read_set) +
+                    # print("read set: " + str(self.version_vector) +
                     #       "server_accept_time: " + str(server_vv))
                     err_dep = False
-                    union_keys = set(self.read_set.keys())\
+                    union_keys = set(self.version_vector.keys())\
                     .union(server_vv.keys())
                     for i in union_keys:
                         if not i in server_vv:
                             get_content = song_name+":ERR_DEP"
                             err_dep = True
                             break
-                        elif i in self.read_set and \
-                             self.read_set[i] > server_vv[i]:
+                        elif i in self.version_vector and \
+                             self.version_vector[i] > server_vv[i]:
                             get_content = song_name+":ERR_DEP"
                             err_dep = True
                             break
                     if not err_dep:
                         get_content = song_name+":"+song_url
                     for i in union_keys:
-                        if i in server_vv and i in self.read_set and\
-                        self.read_set[i] < server_vv[i]:
-                            self.read_set[i] = server_vv[i]
-                        if not i in self.read_set:
-                            self.read_set[i] = server_vv[i]
+                        if i in server_vv and i in self.version_vector and\
+                        self.version_vector[i] < server_vv[i]:
+                            self.version_vector[i] = server_vv[i]
+                        if not i in self.version_vector:
+                            self.version_vector[i] = server_vv[i]
                     m_get_msg = Message(self.node_id, None, "MGetAck", get_content)
                     self.nt.send_to_master(m_get_msg)
 
                 elif buf.mtype == "Done":
-                    # print("read set: " + str(self.read_set) + "server_accept_time: " + str(buf.content))
-                    union_keys = set(self.read_set.keys())\
+                    # print("read set: " + str(self.version_vector) + "server_accept_time: " + str(buf.content))
+                    union_keys = set(self.version_vector.keys())\
                                      .union(buf.content.keys())
                     for i in union_keys:
-                        if i in buf.content and i in self.read_set and\
-                        self.read_set[i] < buf.content[i]:
-                            self.read_set[i] = buf.content[i]
-                        if not i in self.read_set:
-                            self.read_set[i] = buf.content[i]
+                        if i in buf.content and i in self.version_vector and\
+                        self.version_vector[i] < buf.content[i]:
+                            self.version_vector[i] = buf.content[i]
+                        if not i in self.version_vector:
+                            self.version_vector[i] = buf.content[i]
 
                     done = Message(self.node_id, None, "Done", None)
                     self.nt.send_to_master(done)
