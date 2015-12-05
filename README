@@ -128,3 +128,8 @@ not empty.
 The Anti-Entropy can either be accepted or be rejected by the destination. This
 is to guarantee that the database will not be modified by several instances.
 The destination will try the lock to determine whether it accepts the request.
+
+Primary Election
+------------------------------------------------------------------------------
+When primary retires, it needs to do an antientropy with one other server to
+write out its retirement. It will also notify that server be the new primary.
