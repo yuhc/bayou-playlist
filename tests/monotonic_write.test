@@ -13,6 +13,7 @@ stabilize
 get 2 d
 printLog 1
 restoreConnection 0 1
+stabilize
 put 2 d 131415
 stabilize
 get 2 a

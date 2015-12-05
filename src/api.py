@@ -154,6 +154,7 @@ class API:
             else:
                 m_break = Message(-1, None, "Restore", ("Client", id2))
             self.nt.send_to_node(id1, m_break)
+            time.sleep(0.1)
 
 
     def pause(self):
