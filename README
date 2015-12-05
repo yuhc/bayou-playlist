@@ -91,7 +91,7 @@ perform the write which satisfies the write session guarantee. For read, the
 client will get the server's version vector and the client will compare its
 version vector with the server's version vector. If the server's version
 vector does not dominant the client's version vector, the client will output
-ERR_DEP for the song url and this helps to implement the read sessoin guarantee.
+ERR_DEP for the song url and this helps to implement the read session guarantee.
 
 
 Some Techniques
