@@ -167,23 +167,25 @@ class Server:
 
                 elif buf.mtype == "AntiEn_Ack":
                     if LOCK_LOG:
-                        print(self.uid, "tries to acquire a c_request_antientropy lock in receive.AntiEn_Ack")
+                        print(self.uid, "tries to acquire a",
+                              "c_request_antientropy lock in",
+                              "receive.AntiEn_Ack")
                     self.c_request_antientropy.acquire()
                     if LOCK_LOG:
-                        print(self.uid, "acquires a c_request_antientropy lock \
-                              in receive.AntiEn_Ack")
+                        print(self.uid, "acquires a c_request_antientropy lock",
+                              "in receive.AntiEn_Ack")
                     self.m_anti_entropy = copy.deepcopy(buf.content)
                     self.c_request_antientropy.notify()
                     self.c_request_antientropy.release()
                     if LOCK_LOG:
-                        print(self.uid, "releases a c_request_antientropy lock \
-                              in receive.AntiEn_Ack")
+                        print(self.uid, "releases a c_request_antientropy lock",
+                              "in receive.AntiEn_Ack")
 
                 elif buf.mtype == "AntiEn_Finsh":
                     self.c_antientropy.release()
                     if LOCK_LOG:
-                        print(self.uid, "releases a c_antientropy lock in \
-                              receive.AntiEn_Finsh")
+                        print(self.uid, "releases a c_antientropy lock in",
+                              "receive.AntiEn_Finsh")
 
                 elif buf.mtype == "Elect":
                     self.is_primary = True
@@ -210,6 +212,8 @@ class Server:
 
                 elif buf.mtype == "Print":
                     self.printLog()
+                    print(self.uid, self.committed_log, self.tentative_log, "XXX",
+                          self.available_list, self.server_list)
 
                 elif buf.mtype == "Get":
                     song_name = buf.content
@@ -355,9 +359,7 @@ class Server:
 
         # finish the anti-entropy
         if succeed_anti:
-            # print(self.uid, "removes", rand_dest)
             self.available_list.remove(rand_dest)
-            print(self.uid, "removes", rand_dest, self.available_list)
             self.sent_list.add(rand_dest)
             m_finish = Message(self.node_id, self.unique_id, "AntiEn_Finsh",
                                None)
@@ -444,7 +446,7 @@ class Server:
         #       "R_version_vector", R_version_vector, "available_list",
         #       self.available_list, "server_list", self.server_list, "++++++++",
         #       self.tentative_log, ">>>>>>>>", self.committed_log)
-        #print(self.uid, "r_vv", R_version_vector, " ~~~~ commit_log", self.committed_log, "**** tentative_log", self.tentative_log)
+        # print(self.uid, "r_vv", R_version_vector, " ~~~~ commit_log", self.committed_log, "**** tentative_log", self.tentative_log)
 
         # tentative log
         for w in self.tentative_log:
@@ -586,6 +588,10 @@ class Server:
         elif w.mtype == "Retirement":
             try:
                 self.version_vector.pop(w.content)
+            except:
+                pass
+            try:
+                self.server_list.remove(w.sender_id)
             except:
                 pass
         if w.state == "COMMITTED":
