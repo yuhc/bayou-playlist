@@ -1,0 +1,22 @@
+joinServer 0
+joinServer 1
+breakConnection 0 1
+joinClient 2 0
+put 2 a 123
+put 2 b 456
+put 2 c 789
+stabilize
+breakConnection 2 0
+restoreConnection 2 1
+put 2 d 101112
+stabilize
+get 2 d
+printLog 1
+restoreConnection 0 1
+put 2 d 131415
+stabilize
+get 2 a
+get 2 b
+get 2 c
+get 2 d
+printLog 1
