@@ -1,0 +1,6 @@
+a:123
+a:123
+PUT:(a, 123):TRUE
+PUT:(b, 456):TRUE
+PUT:(c, 789):TRUE
+PUT:(d, 101112):TRUE

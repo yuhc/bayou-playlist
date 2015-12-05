@@ -30,26 +30,21 @@ outputs in `./solutions`.
 
 `Python3` is required.
 
-We supply **30** test cases including the original ones. Some of them are non-
+We supply **34** test cases including the original ones. Two of them are non-
 deterministic. According to the test environment (the normal desktops) we used,
-most of them lead to identical outputs. But e.g. `crash_half_restart_one.test` and
-`several_servers.test` are very likely to output non-deterministic results, as
-they contain several races. But their outputs are consistent. Therefore,
-normally, passing more than **24** test cases is enough and very lucky for
-the current tester (it does not support to check consistency).
+the others lead to identical outputs.
 
-An example of such cases is `time_bomb.test`:
-```
-start 3 2
-timeBombLeader 4
-sendMessage 0 how
-sendMessage 0 hi
-sendMessage 1 what
-allClear
-printChatLog 1
-printChatLog 0
-```
+The two non-deterministic test cases were named with "parallel", e.g.
+`retire_4_parallel.test` and `monotonic_write_parallel.test` are very likely to
+output different results, as they contain several races. But their outputs are
+consistent. Therefore, normally, passing **32** test cases means the code is
+correct with the current tester (it does not support to check consistency).
 
+
+The first PUT (`3, eyesOfTexas utexas.edu`) will be committed by the primary
+(server#0), and all servers will know it after the first `stabilize`. Then the
+primary is isolated. The second PUT adds a song to server#1, which is later
+known by server#0, the third adds a song to server#2
 Usually the leader will bomb after deciding message `how` (in the real world,
 maybe not). Then during the leader election, client \#0 and \#1 race to request
 `hi` and `what`. So the result may be either
