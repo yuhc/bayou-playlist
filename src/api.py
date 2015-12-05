@@ -142,11 +142,15 @@ class API:
         if id1 in self.nodes and id2 in self.nodes:
             if id1 in self.servers:
                 m_break = Message(-1, None, "Restore", ("Server", id1))
+                if id2 in self.clients:
+                    self.client_s[id2] = id1
             else:
                 m_break = Message(-1, None, "Restore", ("Client", id1))
             self.nt.send_to_node(id2, m_break)
             if id2 in self.servers:
                 m_break = Message(-1, None, "Restore", ("Server", id2))
+                if id1 in self.clients:
+                    self.client_s[id1] = id2
             else:
                 m_break = Message(-1, None, "Restore", ("Client", id2))
             self.nt.send_to_node(id1, m_break)

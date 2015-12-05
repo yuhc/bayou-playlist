@@ -189,7 +189,6 @@ class Server:
 
                 elif buf.mtype == "Elect":
                     self.is_primary = True
-                    print(self.uid, "elected")
 
                 # from master
                 elif buf.mtype == "Break":
@@ -212,8 +211,7 @@ class Server:
                     self.is_paused = False
 
                 elif buf.mtype == "Print":
-                    # print(self.uid, self.committed_log, self.tentative_log, "XXX",
-                    #       self.available_list, self.server_list, self.is_primary)
+                    # print(self.uid, self.committed_log, self.tentative_log)
                     self.printLog()
 
                 elif buf.mtype == "Get":
@@ -284,17 +282,17 @@ class Server:
     def handle_client_write(self, buff):
         buf = copy.deepcopy(buff)
         if LOCK_LOG:
-            print(self.uid, "tries to acquire a c_antientropy \
-                  lock in receive.Write.Client")
+            print(self.uid, "tries to acquire a c_antientropy",
+                  "lock in receive.Write.Client")
         self.c_antientropy.acquire()
         if LOCK_LOG:
-            print(self.uid, "acquires a c_antientropy lock in \
-                  receive.Write.Client")
+            print(self.uid, "acquires a c_antientropy lock in",
+                  "receive.Write.Client")
         self.receive_client_writes(buf.content)
         self.c_antientropy.release()
         if LOCK_LOG:
-            print(self.uid, "releases a c_antientropy lock in \
-                  receive.Write.Client")
+            print(self.uid, "releases a c_antientropy lock in",
+                  "receive.Write.Client")
         done = Message(self.node_id, None, "Done", self.version_vector)
         self.nt.send_to_node(buf.sender_id, done)
 
@@ -302,18 +300,18 @@ class Server:
     Create a thread handle AntiEn_Reject. '''
     def handle_antien_reject(self):
         if LOCK_LOG:
-            print(self.uid, "tries to acquire a c_request_antientropy lock in \
-                  receive.AntiEn_Reject")
+            print(self.uid, "tries to acquire a c_request_antientropy lock in",
+                  "receive.AntiEn_Reject")
         self.c_request_antientropy.acquire()
         if LOCK_LOG:
-            print(self.uid, "acquires a c_request_antientropy lock in \
-                  receive.AntiEn_Reject")
+            print(self.uid, "acquires a c_request_antientropy lock in",
+                  "receive.AntiEn_Reject")
         self.m_anti_entropy = Message(None, None, None, "Reject")
         self.c_request_antientropy.notify()
         self.c_request_antientropy.release()
         if LOCK_LOG:
-            print(self.uid, "releases a c_request_antientropy lock in \
-                  receive.AntiEn_Reject")
+            print(self.uid, "releases a c_request_antientropy lock in",
+                  "receive.AntiEn_Reject")
 
     '''
     Process Anti-Entropy periodically. '''
@@ -335,12 +333,12 @@ class Server:
             return
 
         if LOCK_LOG:
-            print(self.uid, "tries to acquire a c_antientropy lock in \
-                  timer_anti_entropy")
+            print(self.uid, "tries to acquire a c_antientropy lock in",
+                  "timer_anti_entropy")
         self.c_antientropy.acquire()
         if LOCK_LOG:
-            print(self.uid, "acquires a c_antientropy lock in \
-                  timer_anti_entropy")
+            print(self.uid, "acquires a c_antientropy lock in",
+                  "timer_anti_entropy")
 
         rand_dest = list(self.available_list)[0]
 
@@ -403,6 +401,10 @@ class Server:
 
         if not self.nt.send_to_node(receiver_id, m_request_anti):
             self.c_request_antientropy.release()
+            try:
+                self.server_list.remove(receiver_id) # receiver has retired
+            except:
+                pass
             return False
         while True:
             if self.m_anti_entropy:
@@ -595,6 +597,7 @@ class Server:
                 self.server_list.remove(w.sender_id)
             except:
                 pass
+            self.sent_list = set()
         if w.state == "COMMITTED":
             w.CSN = self.CSN + 1
             self.committed_log.append(w)
