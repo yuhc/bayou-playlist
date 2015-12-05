@@ -62,6 +62,7 @@ class Server:
             self.accept_time = self.accept_time + 1
             w_create = Write(self.node_id, self.unique_id, "Creation", None,
                              self.accept_time, self.unique_id)
+            w_create.state = "COMMITTED"
             self.bayou_write(w_create)
 
         # start Anti-Entropy
@@ -91,8 +92,8 @@ class Server:
                         w = buf.content
                         if w.content: # first creation
                             # rewrite Creation's wid
-                            w.wid = (w.accept_time, w.sender_uid)
                             w.sender_uid = (self.accept_time, self.unique_id)
+                            w.wid = (w.accept_time, w.sender_uid)
 
                         self.receive_server_writes(w)
 
@@ -224,10 +225,6 @@ class Server:
                 elif buf.mtype == "Write":
                     if self.is_retired:
                         continue
-
-                    # primary commits immediately
-                    if self.is_primary:
-                        buf.content.state = "COMMITTED"
 
                     if buf.sender_id in self.server_list:
                         if TERM_LOG:
@@ -440,10 +437,15 @@ class Server:
                                    "Write", w)
                 self.nt.send_to_node(receiver_id, m_commit)
         # tentative log
+<<<<<<< HEAD
         print(self.uid, self.unique_id, "antientropy with", receiver_id,
               "R_version_vector", R_version_vector, "available_list",
               self.available_list, "server_list", self.server_list, "++++++++",
               self.tentative_log, ">>>>>>>>", self.committed_log)
+=======
+        #print(self.uid, "r_vv", R_version_vector, " ~~~~ commit_log", self.committed_log, "**** tentative_log", self.tentative_log)
+
+>>>>>>> 3b16b9eb28ecbfb9232a97fb3777b1a4cb8a7993
         for w in self.tentative_log:
             if not w.sender_uid in R_version_vector or \
                R_version_vector[w.sender_uid] < w.accept_time:
@@ -459,6 +461,9 @@ class Server:
     Receive_Writes in paper Bayou, client part. '''
     def receive_client_writes(self, wx):
         w = copy.deepcopy(wx)
+        # primary commits immediately
+        if self.is_primary:
+            w.state = "COMMITTED"
         w.sender         = self.node_id
         w.sender_uid     = self.unique_id
         w.accept_time    = self.accept_time
@@ -469,7 +474,12 @@ class Server:
         self.available_list = self.available_list.union(self.sent_list)
         self.sent_list      = set()
 
-    def receive_server_writes(self, w):
+    def receive_server_writes(self, wt):
+        w = copy.deepcopy(wt)
+        # primary commits immediately
+        if self.is_primary:
+            w.state = "COMMITTED"
+
         if w.state == "COMMITTED":
             insert_point = len(self.committed_log)
             for i in range(len(self.committed_log)):
