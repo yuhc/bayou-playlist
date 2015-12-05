@@ -316,8 +316,9 @@ class Server:
         if TERM_LOG and DETAIL_LOG:
             print(self.uid, "current lists: server_list", self.server_list,
                   "block_list", self.block_list)
-        self.available_list = self.available_list.union(self.server_list)
+        self.available_list = copy.deepcopy(self.server_list)
         self.available_list = self.available_list.difference(self.block_list)
+        self.available_list = self.available_list.difference(self.sent_list)
         if self.node_id in self.available_list:
             self.available_list.remove(self.node_id)
         if not self.available_list or self.is_paused:
@@ -354,6 +355,7 @@ class Server:
 
         # finish the anti-entropy
         if succeed_anti:
+            # print(self.uid, "removes", rand_dest)
             self.available_list.remove(rand_dest)
             self.sent_list.add(rand_dest)
             m_finish = Message(self.node_id, self.unique_id, "AntiEn_Finsh",
@@ -437,10 +439,10 @@ class Server:
                                    "Write", w)
                 self.nt.send_to_node(receiver_id, m_commit)
         # tentative log
-        print(self.uid, self.unique_id, "antientropy with", receiver_id,
-              "R_version_vector", R_version_vector, "available_list",
-              self.available_list, "server_list", self.server_list, "++++++++",
-              self.tentative_log, ">>>>>>>>", self.committed_log)
+        # print(self.uid, self.unique_id, "antientropy with", receiver_id,
+        #       "R_version_vector", R_version_vector, "available_list",
+        #       self.available_list, "server_list", self.server_list, "++++++++",
+        #       self.tentative_log, ">>>>>>>>", self.committed_log)
         #print(self.uid, "r_vv", R_version_vector, " ~~~~ commit_log", self.committed_log, "**** tentative_log", self.tentative_log)
 
         for w in self.tentative_log:
@@ -472,10 +474,13 @@ class Server:
         self.sent_list      = set()
 
     def receive_server_writes(self, wt):
+        new_write = False
         w = copy.deepcopy(wt)
         # primary commits immediately
         if self.is_primary:
             w.state = "COMMITTED"
+        len_committed_log = len(self.committed_log)
+        len_tentative_log = len(self.tentative_log)
 
         if w.state == "COMMITTED":
             insert_point = len(self.committed_log)
@@ -514,6 +519,11 @@ class Server:
             for wx in tmp_tentative_log:
                 self.bayou_write(wx)
 
+            # new item added in committed log
+            if (len(self.committed_log) > len_committed_log):
+                #print(self.uid, "original committed log length", len_committed_log,
+                #      "current committed log length", len(self.committed_log))
+                new_write = True
             if TERM_LOG:
                 print(self.uid, "<FINAL COMMIT>", "commit", self.committed_log, "tentative", self.tentative_log)
 
@@ -549,12 +559,19 @@ class Server:
             # roll forward
             for wx in suffix_tentative_log:
                 self.bayou_write(wx)
+            if (len(self.tentative_log) > len_tentative_log):
+                #print(self.uid, "original tentative log length", len_tentative_log,
+                #      "current tentative_log length", len(self.tentative_log))
+                new_write = True
             if TERM_LOG:
                 print(self.uid, "<FINAL TENTATIVE>", "commit", self.committed_log, "tentative", self.tentative_log)
+            
 
         # update available_list
-        self.available_list = self.available_list.union(self.sent_list)
-        self.sent_list      = set()
+        if new_write:
+            self.available_list = self.available_list.union(self.sent_list)
+            self.sent_list      = set()
+
 
     '''
     Bayou_Write in paper Bayou. '''
