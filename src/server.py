@@ -355,6 +355,7 @@ class Server:
         # finish the anti-entropy
         if succeed_anti:
             self.available_list.remove(rand_dest)
+            print(self.uid, "removes", rand_dest, self.available_list)
             self.sent_list.add(rand_dest)
             m_finish = Message(self.node_id, self.unique_id, "AntiEn_Finsh",
                                None)
@@ -437,7 +438,7 @@ class Server:
                                    "Write", w)
                 self.nt.send_to_node(receiver_id, m_commit)
         # tentative log
-        #print(self.uid, "r_vv", R_version_vector, " ~~~~ commit_log", self.committed_log, "**** tentative_log", self.tentative_log)
+        print(self.uid, "::::", "avail_list", self.available_list, "+++++++ r_vv", R_version_vector, " ~~~~ commit_log", self.committed_log, "**** tentative_log", self.tentative_log)
 
         for w in self.tentative_log:
             if not w.sender_uid in R_version_vector or \
@@ -472,6 +473,7 @@ class Server:
         # primary commits immediately
         if self.is_primary:
             w.state = "COMMITTED"
+        whether_new = True
 
         if w.state == "COMMITTED":
             insert_point = len(self.committed_log)
@@ -503,8 +505,9 @@ class Server:
             ww.CSN = None
             try:
                 self.tentative_log.remove(ww)
+                whether_new = True
             except:
-                pass
+                whether_new = False
             tmp_tentative_log = copy.deepcopy(self.tentative_log)
             self.tentative_log = []
             for wx in tmp_tentative_log:
@@ -549,8 +552,9 @@ class Server:
                 print(self.uid, "<FINAL TENTATIVE>", "commit", self.committed_log, "tentative", self.tentative_log)
 
         # update available_list
-        self.available_list = self.available_list.union(self.sent_list)
-        self.sent_list      = set()
+        if whether_new:
+            self.available_list = self.available_list.union(self.sent_list)
+            self.sent_list      = set()
 
     '''
     Bayou_Write in paper Bayou. '''
