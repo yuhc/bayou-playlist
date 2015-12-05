@@ -437,15 +437,12 @@ class Server:
                                    "Write", w)
                 self.nt.send_to_node(receiver_id, m_commit)
         # tentative log
-<<<<<<< HEAD
         print(self.uid, self.unique_id, "antientropy with", receiver_id,
               "R_version_vector", R_version_vector, "available_list",
               self.available_list, "server_list", self.server_list, "++++++++",
               self.tentative_log, ">>>>>>>>", self.committed_log)
-=======
         #print(self.uid, "r_vv", R_version_vector, " ~~~~ commit_log", self.committed_log, "**** tentative_log", self.tentative_log)
 
->>>>>>> 3b16b9eb28ecbfb9232a97fb3777b1a4cb8a7993
         for w in self.tentative_log:
             if not w.sender_uid in R_version_vector or \
                R_version_vector[w.sender_uid] < w.accept_time:
