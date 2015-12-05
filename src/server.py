@@ -652,8 +652,8 @@ class Server:
     Print playlist and send it to master. '''
     def printLog(self):
         plog = ""
+        contents = []
         for wx in self.committed_log:
-            contents = []
             if wx.mtype == "Put" or wx.mtype == "Delete":
                 contents = wx.content.split(' ')
             if wx.mtype == "Put":
@@ -662,6 +662,8 @@ class Server:
             elif wx.mtype == "Delete":
                 plog = plog + "DELETE:(" + contents[0] + "):TRUE\n"
         for wx in self.tentative_log:
+            if wx.mtype == "Put" or wx.mtype == "Delete":
+                contents = wx.content.split(' ')
             if wx.mtype == "Put":
                 plog = plog + "PUT:(" + contents[0] + ", " + contents[1] + \
                        "):FALSE\n"
