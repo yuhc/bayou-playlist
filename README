@@ -1,8 +1,8 @@
 # Bayou
 
 This is a Bayou implementation based on D. Terry's Managing Update Conflicts
-in Bayou, and Session Guarantees for Weakly Consistent Replicated Data, and
-K. Petersen's Flexible Update Propagation.
+in Bayou [1], and Session Guarantees for Weakly Consistent Replicated Data [2],
+and K. Petersen's Flexible Update Propagation [3].
 
 Now the README is copied directly from Paxos project. It will be updated later.
 
@@ -30,60 +30,30 @@ outputs in `./solutions`.
 
 `Python3` is required.
 
-We supply **34** test cases including the original ones. Two of them are non-
-deterministic. According to the test environment (the normal desktops) we used,
-the others lead to identical outputs.
-
-The two non-deterministic test cases were named with "parallel", e.g.
-`retire_4_parallel.test` and `monotonic_write_parallel.test` are very likely to
-output different results, as they contain several races. But their outputs are
-consistent. Therefore, normally, passing **32** test cases means the code is
-correct with the current tester (it does not support to check consistency).
-
-
-The first PUT (`3, eyesOfTexas utexas.edu`) will be committed by the primary
-(server#0), and all servers will know it after the first `stabilize`. Then the
-primary is isolated. The second PUT adds a song to server#1, which is later
-known by server#0, the third adds a song to server#2
-Usually the leader will bomb after deciding message `how` (in the real world,
-maybe not). Then during the leader election, client \#0 and \#1 race to request
-`hi` and `what`. So the result may be either
-```
-0 0: how
-1 0: hi
-2 1: what
-0 0: how
-1 0: hi
-2 1: what
-```
-
-or
-```
-0 0: how
-1 1: what
-2 0: hi
-0 0: how
-1 1: what
-2 0: hi
-```
-
+We supply **35** test cases including the original ones. They cover most special
+cases including the basic operations and the session guarantees.
 
 Some Assumptions
 ==============================================================================
 * The tester should leave enough minutes for each test case. For the given test
-cases, our program runs in less than 20 seconds. But it may run longer when
-given other tests.
+cases, our program runs in less than 5 min (which is the time given by the
+default tester). But it may run longer when given other tests (e.g. creating
+20 servers and executing a `stabilize). We modified the timer to 50 min in order
+to finish the test of 35 test cases.
 
 * No crashes in the system.
 
 * A client will only connect one server at a time.
 
-* You should make sure that the indexes are not out of bound.
+* You should make sure that the indexes are not out of bound (otherwise that
+command will be ignored).
 
 * The channel is valid.
 
+* `retirement` should be passed via Anti-Entropy.
 
-Modification of Paxos
+
+Modification of Bayou
 ==============================================================================
 
 Master
@@ -92,31 +62,26 @@ The master reads the input commands, and send messages to clients or servers
 accordingly. Besides, the master needs to create the processes of servers and
 clients. All the output that tester needs are written by master (to stdout).
 
-As there are some commands requiring blocking, we use asynchronous blocking
-instead of `time.sleep()` to wait for the completion of these commands. At the
-end of the execution of master, it kills all the processes in order to release
-the ports occupied by them.
+As there are some commands requiring blocking, we use either asynchronous
+blocking (conditional locks) or simple `time.sleep()` to wait for the completion
+of these commands. At the end of the execution of master, it kills all the
+processes in order to release the ports occupied by them.
 
 Server
 ------------------------------------------------------------------------------
-The code for server lives in node.py. Each server may have multiple roles
-(Acceptor, Replica, Leader, Scout and Commander). For Paxos to work, we need
-to have `2f+1` acceptors and `f+1` replicas. In our implementation, we choose
-to have `2f+1` replicas to better handling the case when f+1 replicas fail.
-Each server calculates `f` and assign the role based on the node id. `0` .. `f`
-are replicas and all servers are acceptors. Initially, master assign server 0
-as the leader and if it fails, server will elect a new leader according to the
-leader election algorithm described below. We encapsulate each role as a
-separate class and create a cooresponding object when a server needs a role to
-perform Paxos operations.
+The code for server lives in server.py. Each server has the attributes of its
+`node_id`, `unique_id`, `accept_time` (of writes), `version_vector` etc. Some
+technical details are stated in the Technique Section.
 
-The created objects include Replica, Leader and Acceptor. If a server is the
-leader, then it also creates some Scouts and Commanders. When the server
-receives a message, it throws the message to cooresponding object.
+The server creates a thread to handle the socket messages. It also creates a
+separate thread to handle each anti-entropy process. We use conditional locks to
+guarantee that the database is being edited only by one process.
+
+The functions of server are mainly based on [1] and [3].
 
 Client
 ------------------------------------------------------------------------------
-The client sends message to server when master gives a get/put/delete command.
+The client sends message to server when master gives a GET/PUT/DELETE command.
 It keeps a version vector to indicate the write it has seen. When a write or
 read success, the message will carry the server's version vector and client
 will update its version vector. During write (for both put and delete), client
@@ -126,78 +91,38 @@ perform the write which satisfies the write session guarantee. For read, the
 client will get the server's version vector and the client will compare its
 version vector with the server's version vector. If the server's version
 vector does not dominant the client's version vector, the client will output
-ERR_DEP for the song url and this helps to implement the read sessoin guarantee. 
+ERR_DEP for the song url and this helps to implement the read sessoin guarantee.
 
 
 Some Techniques
 ==============================================================================
+
+Message Formats
+------------------------------------------------------------------------------
+The messages are stored as objects. They are defined in `./src/message.py`.
+There are three kinds of messages, normal `Message`, Anti-Entropy information
+`AntiEntropy` and the writes `Write`. The network handler only sends and
+receives `Message`. The `AntiEntropy` and `Write` are contained in the
+`Message.content`. The messages and writes are specified with their unique ids.
+Writes are also assigned with their states, write id, and accepted time. This
+contents are used for reducing the unnecessary messages during Anti-Entropy [3].
+
+Trigger Anti-Entropy
+------------------------------------------------------------------------------
+The Anti-Entropy process described in [3] is triggered periodically. The period
+is randomly selected at the end of each Anti-Entropy. The server keeps four
+lists: `server_list`, `block_list`, `sent_list` and `available_list`. Each time
+the server will choose one destination from `available_list` to request the
+Anti-Entropy.
+
+The Anti-Entropy can either be accepted or be rejected by the destination. This
+is to guarantee that the database will not be modified by several instances.
+The destination will try the lock to determine whether it accepts the request.
 
 Primary Election
 ------------------------------------------------------------------------------
 When primary retires, it needs to do an antientropy with one other server to
 write out its retirement. It will also notify that server be the new primary. 
 
-Message Formats
-------------------------------------------------------------------------------
-The messages are stored as tuples. Typically, a message is in the following
-format (we use the propose from Replicas as example):
-```python
-message = ('propose', (slot_num, proposal))
-```
 
-`message[0]` means the type of the message, and `message[1]` contains the
-information. `slot_num` is an integer, and `proposal` is another tuple:
-```python
-proposal = (client_id, command_id, chatlog)
-```
-
-The messages are parsed by `ast.literal_eval()`.
-
-Asynchronous Blocking
-------------------------------------------------------------------------------
-Master and Clients may be blocked due to `restartServer`, `printChatLog` and
-`allClear`. We do not use `time.sleep()` to implement the blocking. Instead,
-the processes wait for others' acknowledges to get out of the blocking.
-
-Failure Detection
-------------------------------------------------------------------------------
-The only leader in the system keeps broadcasting heartbeat to other servers.
-Each server creates a thread to detect the heartbeat. When a server does not
-receive heartbeat in a fixed period (timeout), this server regards the leader
-crashed, and starts a leader election protocol.
-
-Leader Election
-
-------------------------------------------------------------------------------
-We made a bit modification of the leader election in Three-Phase-Commit project.
-When a leader election starts, the server marks `leader_is_dead` as `True`,
-regards itself as the new leader, and broadcast a heartbeat containing its
-`node_id`. If a server receives a heartbeat from others, it updates its
-`leader_id` to the `node_id` in the heartbeat when `node_id` smaller than its
-own id or `leader_is_dead` is `True`. Then it marks `leader_is_dead` as `False`.
-
-After three rounds (actually two are enough), all servers have the same
-`leader_id`, which is the smallest index of them. Then this new leader sends a
-acknowledge message to all Clients. The Clients then resend the
-messages in their waiting queues.
-
-
-Using Auto Grader
-==============================================================================
-Run "python tester.py" and check your output.
-
-To add your own tests, create a .test file and a .sol file in the tests/ and solutions/ directories respectively.
-You can check what your output was in the answers/ directory.
-
-Running tests manually:
-
-To run the sample tests, replace test_name with the name of the test and execute the following command:
-
-cat tests/[test_name].test | $(cat COMMAND)
-
-To automatically check the output:
-
-cat tests/[test_name].test | $(cat COMMAND) > temp_output && diff -q temp_output tests/[test_name].sol
-
-If your output matches the solution, NOTHING will be printed. Otherwise the lines that differ will be shown.
-The output for the run of the test will also be stored in a file temp_output after running the second command.
+When a primary is
