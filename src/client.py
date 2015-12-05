@@ -68,7 +68,7 @@ class Client:
 
                 elif buf.mtype == "Delete":
                     w = Write(self.node_id, None, "Delete", None, 0,
-                              buf.content)
+                              (buf.content, self.version_vector))
                     m_delete = Message(self.node_id, None, "Write", w)
                     c_can_send_to_server.acquire()
                     while True:
