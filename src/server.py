@@ -189,6 +189,7 @@ class Server:
 
                 elif buf.mtype == "Elect":
                     self.is_primary = True
+                    print(self.uid, "elected")
 
                 # from master
                 elif buf.mtype == "Break":
@@ -211,9 +212,9 @@ class Server:
                     self.is_paused = False
 
                 elif buf.mtype == "Print":
+                    # print(self.uid, self.committed_log, self.tentative_log, "XXX",
+                    #       self.available_list, self.server_list, self.is_primary)
                     self.printLog()
-                    print(self.uid, self.committed_log, self.tentative_log, "XXX",
-                          self.available_list, self.server_list)
 
                 elif buf.mtype == "Get":
                     song_name = buf.content
