@@ -115,11 +115,16 @@ lists: `server_list`, `block_list`, `sent_list` and `available_list`. Each time
 the server will choose one destination from `available_list` to request the
 Anti-Entropy.
 
+The destination can either be chosen in a randomized way or a determined way.
+In a gossip system, it is usually chosen randomly. In our implemented system,
+instead of choosing a random node (which is not very efficient because the
+Uniform Random Generator is not actually uniform when there are only very few
+connected servers), we always choose the first node in `available_list`, and
+remove it from the list when the Anti-Entropy finishes. All available servers
+will be added into this list again when any modification is made to the
+database. Then the Anti-Entropy will be kept doing if the `available_list` is
+not empty.
+
 The Anti-Entropy can either be accepted or be rejected by the destination. This
 is to guarantee that the database will not be modified by several instances.
 The destination will try the lock to determine whether it accepts the request.
-
-Primary Election
-------------------------------------------------------------------------------
-
-When a primary is
