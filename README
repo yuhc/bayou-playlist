@@ -123,6 +123,3 @@ Primary Election
 ------------------------------------------------------------------------------
 When primary retires, it needs to do an antientropy with one other server to
 write out its retirement. It will also notify that server be the new primary. 
-
-
-When a primary is
