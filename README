@@ -132,6 +132,11 @@ ERR_DEP for the song url and this helps to implement the read sessoin guarantee.
 Some Techniques
 ==============================================================================
 
+Primary Election
+------------------------------------------------------------------------------
+When primary retires, it needs to do an antientropy with one other server to
+write out its retirement. It will also notify that server be the new primary. 
+
 Message Formats
 ------------------------------------------------------------------------------
 The messages are stored as tuples. Typically, a message is in the following
@@ -162,6 +167,7 @@ receive heartbeat in a fixed period (timeout), this server regards the leader
 crashed, and starts a leader election protocol.
 
 Leader Election
+
 ------------------------------------------------------------------------------
 We made a bit modification of the leader election in Three-Phase-Commit project.
 When a leader election starts, the server marks `leader_is_dead` as `True`,
