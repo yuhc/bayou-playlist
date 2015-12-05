@@ -569,7 +569,8 @@ class Server:
             if (len(self.tentative_log) > len_tentative_log):
                 new_write = True
             if TERM_LOG:
-                print(self.uid, "<FINAL TENTATIVE>", "commit", self.committed_log, "tentative", self.tentative_log)
+                print(self.uid, "<FINAL TENTATIVE>", "commit",
+                      self.committed_log, "tentative", self.tentative_log)
 
 
         # update available_list
@@ -585,7 +586,10 @@ class Server:
             self.playlist[cmd[0]] = cmd[1]
         elif w.mtype == "Delete":
             cmd = w.content
-            self.playlist.pop(cmd)
+            try:
+                self.playlist.pop(cmd)
+            except:
+                pass
         elif w.mtype == "Creation":
             self.server_list.add(w.sender_id)
         elif w.mtype == "Retirement":

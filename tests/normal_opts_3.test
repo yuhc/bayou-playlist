@@ -4,20 +4,13 @@ joinServer 2
 joinServer 3
 joinServer 4
 joinServer 5
-joinServer 6
-joinServer 7
 joinClient 8 0
 joinClient 9 1
 joinClient 10 2
 joinClient 11 3
 joinClient 12 4
-pause
 retireServer 0
-start
-stabilize
-pause
 retireServer 1
-start
 stabilize
 put 11 butts www.youtube.com/watch?v=8ic9-R49IWs
 stabilize
