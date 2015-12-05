@@ -12,7 +12,7 @@ class Config:
     client_log           = False
 
     master_log           = False
-    master_cmd           = True
+    master_cmd           = False
 
     stabilize_time       = 5
     start_server_time    = 0.3
