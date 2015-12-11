@@ -4,16 +4,14 @@ This is a Bayou implementation based on D. Terry's Managing Update Conflicts
 in Bayou [1], and Session Guarantees for Weakly Consistent Replicated Data [2],
 and K. Petersen's Flexible Update Propagation [3].
 
-Now the README is copied directly from Paxos project. It will be updated later.
-
 
 Project Information
 ==============================================================================
 CS 380D Distributed Computing, Fall 2015
 
 Project 3, Bayou
-* Hangchen Yu, UT EID: HY4987, UTCS ID: HYU
-* Zhiting Zhu, UT EID: ZZ3883, UTCS ID: ZHITINGZ
+* Hangchen Yu
+* Zhiting Zhu
 
 
 Testing the Project
